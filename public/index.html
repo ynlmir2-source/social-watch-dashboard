@@ -223,7 +223,6 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
     <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Keywords & rules</button>
     <button class="nav-btn" data-view="automations"><span class="nav-icon">⤳</span>Automations</button>
     <button class="nav-btn" data-view="integrations"><span class="nav-icon">▦</span>Integrations</button>
-    <button class="nav-btn" data-view="servers"><span class="nav-icon">⚙</span>Servers</button>
     <button class="nav-btn" data-view="servers"><span class="nav-icon">⚙</span>Server manager</button>
   </nav></div>
   <div><div class="nav-label">Manage</div><nav><button class="nav-btn" data-view="settings"><span class="nav-icon">⚙</span>Settings</button></nav></div>
@@ -447,11 +446,6 @@ $("clearServerResult").addEventListener("click",()=>{$("serverActionResult").cla
 $("runServerAction").addEventListener("click",async()=>{
   const service=$("serverService").value;
   const action=$("serverAction").value;
-  const confirmChecked=$("serverActionConfirm").checked;
-  if(action!=="status"&&!confirmChecked){
-    toast("Check the confirmation box before running this action.",true);
-    return;
-  }
   if(action==="shutdown"&&!window.confirm("Shut down this service? It may become unavailable until started again."))return;
   if(action==="restart"&&!window.confirm("Restart this service? It may be briefly unavailable."))return;
   if((action==="redeploy"||action==="deploy")&&!window.confirm("Start a deployment for this service?"))return;
