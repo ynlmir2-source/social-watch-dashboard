@@ -703,13 +703,13 @@ app.get("/api/logs", requireLogin, async (req, res) => {
       `SELECT COUNT(*)::int AS total FROM social_watch_logs ${where}`,
       values
     );
-    values.push(limit, offset);
+    const pageValues = [...values, limit, offset];
     const result = await pool.query(
       `SELECT id, level, source, message, details, created_at
        FROM social_watch_logs ${where}
        ORDER BY created_at DESC
-       LIMIT ${values.length - 1} OFFSET ${values.length}`,
-      values
+       LIMIT ${values.length + 1} OFFSET ${values.length + 2}`,
+      pageValues
     );
     res.json({ logs: result.rows, total: countResult.rows[0].total, limit, offset });
   } catch (error) {
