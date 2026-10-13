@@ -224,6 +224,15 @@ function normalizeConfig(input, previous) {
       ? rule.priority
       : "normal";
 
+    const matchMode = ["contains", "whole_word"].includes(rule.matchMode)
+      ? rule.matchMode
+      : "contains";
+    const exclude = Array.isArray(rule.exclude)
+      ? rule.exclude.map((item) => String(item).trim().toLowerCase().slice(0, 80)).filter(Boolean).slice(0, 20)
+      : typeof rule.exclude === "string"
+        ? rule.exclude.split(",").map((item) => item.trim().toLowerCase().slice(0, 80)).filter(Boolean).slice(0, 20)
+        : [];
+
     keywords.push({
       id: typeof rule.id === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(rule.id)
         ? rule.id
@@ -231,6 +240,8 @@ function normalizeConfig(input, previous) {
       term,
       priority,
       enabled: rule.enabled !== false,
+      matchMode,
+      exclude: [...new Set(exclude)],
     });
   }
 
