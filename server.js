@@ -40,7 +40,7 @@ const pool = new Pool({
 
 const DEFAULT_TERMS = [
   { term: "social watch", priority: "medium", action: "record_only", enabled: true },
-  { term: "project update", priority: "normal", action: "discord", enabled: true },
+  { term: "project update", priority: "normal", action: "redeploy", enabled: true },
   { term: "event announcement", priority: "medium", action: "nest", enabled: true },
   { term: "urgent", priority: "high", action: "discord_nest", enabled: true },
   { term: "launch", priority: "normal", action: "discord_nest", enabled: true },
@@ -233,7 +233,7 @@ function normalizeConfig(input, previous) {
     const matchMode = ["contains", "whole_word"].includes(rule.matchMode)
       ? rule.matchMode
       : "contains";
-    const action = ["record_only", "discord", "nest", "discord_nest"].includes(rule.action)
+    const action = ["record_only", "discord", "nest", "discord_nest", "redeploy"].includes(rule.action)
       ? rule.action
       : defaultKeywordAction(term);
     const exclude = Array.isArray(rule.exclude)
