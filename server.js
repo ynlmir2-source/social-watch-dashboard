@@ -638,6 +638,95 @@ app.post("/api/integrations/heartbeat", requireIngestKey, async (req, res) => {
   }
 });
 
+
+const MANAGED_RAILWAY_SERVICES = {
+  dashboard: { id: "3cc5ca5e-7c2c-4781-a3cd-9d9b6a9a3fb9", name: "Social Watch Dashboard" },
+  bot: { id: "f713f7a8-d46a-422a-ad29-c69d56a570f2", name: "Social Watch Bot" },
+};
+
+async function railwayGraphql(query, variables) {
+  const token = process.env.RAILWAY_API_TOKEN;
+  if (!token) throw new Error("Railway control is not configured yet. Add RAILWAY_API_TOKEN to the dashboard service variables.");
+  const response = await fetch("https://backboard.railway.com/graphql/v2", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const payload = await response.json();
+  if (!response.ok || payload.errors?.length) {
+    throw new Error(String(payload.errors?.[0]?.message || "Railway API request failed.").slice(0, 240));
+  }
+  return payload.data || {};
+}
+
+app.get("/api/infrastructure/services", requireLogin, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({
+    provider: "railway",
+    configured: Boolean(process.env.RAILWAY_API_TOKEN && process.env.RAILWAY_ENVIRONMENT_ID),
+    services: Object.entries(MANAGED_RAILWAY_SERVICES).map(([key, service]) => ({ key, name: service.name })),
+    databaseExcluded: true,
+  });
+});
+
+app.post("/api/infrastructure/action", requireLogin, requireSameOrigin, async (req, res) => {
+  const serviceKey = String(req.body?.service || "");
+  const action = String(req.body?.action || "");
+  const confirmed = req.body?.confirm === true;
+  const service = MANAGED_RAILWAY_SERVICES[serviceKey];
+  const allowedActions = new Set(["status", "deploy", "redeploy", "restart", "shutdown", "start"]);
+  if (!service) return res.status(400).json({ error: "Choose a configured application service." });
+  if (!allowedActions.has(action)) return res.status(400).json({ error: "Unsupported infrastructure action." });
+  if (action !== "status" && !confirmed) return res.status(400).json({ error: "Confirm the action before continuing." });
+  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
+  if (!environmentId) return res.status(503).json({ error: "Add RAILWAY_ENVIRONMENT_ID to the dashboard service variables." });
+
+  try {
+    const variables = { serviceId: service.id, environmentId };
+    let result;
+    if (action === "status") {
+      const data = await railwayGraphql(
+        "query ManagedService($serviceId: String!, $environmentId: String!) { serviceInstance(serviceId: $serviceId, environmentId: $environmentId) { serviceName latestDeployment { id status } } }",
+        variables
+      );
+      const instance = data.serviceInstance;
+      if (!instance) throw new Error("Railway did not find this service in the configured environment.");
+      result = { service: instance.serviceName || service.name, status: instance.latestDeployment?.status || "no deployment found" };
+    } else if (action === "deploy" || action === "start") {
+      await railwayGraphql(
+        "mutation Deploy($serviceId: String!, $environmentId: String!) { serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId) }",
+        variables
+      );
+      result = { service: service.name, status: "deploy requested" };
+    } else if (action === "redeploy") {
+      await railwayGraphql(
+        "mutation Redeploy($serviceId: String!, $environmentId: String!) { serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId) }",
+        variables
+      );
+      result = { service: service.name, status: "redeploy requested" };
+    } else {
+      const data = await railwayGraphql(
+        "query ManagedService($serviceId: String!, $environmentId: String!) { serviceInstance(serviceId: $serviceId, environmentId: $environmentId) { serviceName latestDeployment { id status } } }",
+        variables
+      );
+      const deployment = data.serviceInstance?.latestDeployment;
+      if (!deployment?.id) throw new Error("No current deployment was found for this service.");
+      if (action === "restart") {
+        await railwayGraphql("mutation Restart($id: String!) { deploymentRestart(id: $id) }", { id: deployment.id });
+      } else {
+        await railwayGraphql("mutation Stop($id: String!) { deploymentStop(id: $id) }", { id: deployment.id });
+      }
+      result = { service: service.name, status: action === "restart" ? "restart requested" : "shutdown requested" };
+    }
+    console.log("Infrastructure action requested by dashboard user " + (req.user?.username || "unknown") + ": " + action + " " + serviceKey);
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error("Infrastructure action failed:", error.message);
+    res.status(502).json({ error: error.message || "Infrastructure action failed." });
+  }
+});
+
 app.get("/api/integrations", requireLogin, async (req, res) => {
   try {
     const result = await pool.query(
