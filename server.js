@@ -370,6 +370,27 @@ async function initializeDatabase() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_watch_logs (
+      id BIGSERIAL PRIMARY KEY,
+      level TEXT NOT NULL DEFAULT 'info',
+      source TEXT NOT NULL DEFAULT 'social-watch',
+      message TEXT NOT NULL,
+      details JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_logs_created_at_idx
+    ON social_watch_logs (created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_logs_level_created_idx
+    ON social_watch_logs (level, created_at DESC)
+  `);
+
   const defaults = buildDefaultConfig();
   await pool.query(
     `INSERT INTO social_watch_settings (id, config)
@@ -629,6 +650,71 @@ app.get("/api/integrations", requireLogin, async (req, res) => {
   } catch (error) {
     console.error("Integration status failed:", error.message);
     res.status(500).json({ error: "Unable to load integrations." });
+  }
+});
+
+app.post("/api/logs", requireIngestKey, async (req, res) => {
+  try {
+    const level = String(req.body?.level || "info").toLowerCase();
+    const source = String(req.body?.source || "social-watch").trim().slice(0, 120) || "social-watch";
+    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    const details = req.body?.details && typeof req.body.details === "object" && !Array.isArray(req.body.details)
+      ? req.body.details
+      : {};
+
+    if (!["debug", "info", "warning", "error", "critical"].includes(level)) {
+      return res.status(400).json({ error: "Invalid log level." });
+    }
+    if (!message || message.length > 10000) {
+      return res.status(400).json({ error: "Log message is required and must be at most 10000 characters." });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO social_watch_logs (level, source, message, details)
+       VALUES ($1, $2, $3, $4::jsonb)
+       RETURNING id, level, source, message, details, created_at`,
+      [level, source, message, JSON.stringify(details).slice(0, 20000)]
+    );
+    res.status(201).json({ success: true, log: result.rows[0] });
+  } catch (error) {
+    console.error("Failed to save system log:", error.message);
+    res.status(500).json({ error: "Unable to save system log." });
+  }
+});
+
+app.get("/api/logs", requireLogin, async (req, res) => {
+  try {
+    const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit, 10) || 100));
+    const offset = Math.min(1000000, Math.max(0, Number.parseInt(req.query.offset, 10) || 0));
+    const level = String(req.query.level || "").toLowerCase();
+    const search = String(req.query.search || "").trim().slice(0, 200);
+    const clauses = [];
+    const values = [];
+    if (["debug", "info", "warning", "error", "critical"].includes(level)) {
+      values.push(level);
+      clauses.push(`level = ${values.length}`);
+    }
+    if (search) {
+      values.push(`%${search}%`);
+      clauses.push(`(message ILIKE ${values.length} OR source ILIKE ${values.length})`);
+    }
+    const where = clauses.length ? "WHERE " + clauses.join(" AND ") : "";
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM social_watch_logs ${where}`,
+      values
+    );
+    values.push(limit, offset);
+    const result = await pool.query(
+      `SELECT id, level, source, message, details, created_at
+       FROM social_watch_logs ${where}
+       ORDER BY created_at DESC
+       LIMIT ${values.length - 1} OFFSET ${values.length}`,
+      values
+    );
+    res.json({ logs: result.rows, total: countResult.rows[0].total, limit, offset });
+  } catch (error) {
+    console.error("Failed to read system logs:", error.message);
+    res.status(500).json({ error: "Unable to load system logs." });
   }
 });
 
