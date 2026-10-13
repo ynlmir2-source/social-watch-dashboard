@@ -673,7 +673,7 @@ app.post("/api/logs", requireIngestKey, async (req, res) => {
       `INSERT INTO social_watch_logs (level, source, message, details)
        VALUES ($1, $2, $3, $4::jsonb)
        RETURNING id, level, source, message, details, created_at`,
-      [level, source, message, JSON.stringify(details).slice(0, 20000)]
+      [level, source, message, JSON.stringify(details)]
     );
     res.status(201).json({ success: true, log: result.rows[0] });
   } catch (error) {
