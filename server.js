@@ -622,6 +622,18 @@ app.get("/api/integrations", requireLogin, async (req, res) => {
   }
 });
 
+app.get("/api/alerts/sources", requireLogin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT DISTINCT source FROM social_watch_alerts ORDER BY source LIMIT 100"
+    );
+    res.json({ sources: result.rows.map((row) => row.source).filter(Boolean) });
+  } catch (error) {
+    console.error("Could not load alert sources:", error.message);
+    res.status(500).json({ error: "Unable to load alert sources." });
+  }
+});
+
 app.get("/api/alerts", requireLogin, async (req, res) => {
   try {
     const parsedLimit = Number.parseInt(req.query.limit, 10);
@@ -639,6 +651,10 @@ app.get("/api/alerts", requireLogin, async (req, res) => {
     if (["high", "medium", "normal"].includes(String(req.query.priority || ""))) {
       values.push(String(req.query.priority));
       where.push("priority = $" + values.length);
+    }
+    if (typeof req.query.source === "string" && req.query.source.trim()) {
+      values.push(req.query.source.trim().slice(0, 150));
+      where.push("source = $" + values.length);
     }
     if (req.query.status === "unread") where.push("is_read = FALSE");
     if (req.query.status === "read") where.push("is_read = TRUE");
