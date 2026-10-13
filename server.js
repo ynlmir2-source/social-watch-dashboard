@@ -595,7 +595,7 @@ app.post("/api/integrations/heartbeat", requireIngestKey, async (req, res) => {
   if (!services[service]) {
     return res.status(400).json({ error: "Unsupported integration service." });
   }
-  if (!["connected", "error"].includes(status)) {
+  if (!["connected", "error", "configured"].includes(status)) {
     return res.status(400).json({ error: "Invalid integration status." });
   }
 
