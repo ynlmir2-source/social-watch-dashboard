@@ -223,6 +223,8 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
     <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Keywords & rules</button>
     <button class="nav-btn" data-view="automations"><span class="nav-icon">⤳</span>Automations</button>
     <button class="nav-btn" data-view="integrations"><span class="nav-icon">▦</span>Integrations</button>
+    <button class="nav-btn" data-view="servers"><span class="nav-icon">⚙</span>Servers</button>
+    <button class="nav-btn" data-view="servers"><span class="nav-icon">⚙</span>Server manager</button>
   </nav></div>
   <div><div class="nav-label">Manage</div><nav><button class="nav-btn" data-view="settings"><span class="nav-icon">⚙</span>Settings</button></nav></div>
   <div class="side-bottom"><div><span class="pulse-dot"></span><strong id="sideDbStatus">Connecting…</strong></div><p>Alerts refresh automatically. Your credentials and integration secrets stay in Railway.</p></div>
@@ -306,6 +308,34 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
       </div><div class="callout"><strong>Important:</strong> the bot must be online and the Home Assistant webhook variable configured for these delivery rules to take effect. Quiet hours do not pause alert collection.</div></article>
     </section>
 
+
+    <section class="view" id="view-servers">
+      <div class="page-head">
+        <div><div class="eyebrow">Infrastructure control</div><h1>Server manager</h1><p class="lead">Choose a connected service and manage its deployment. Only listed application services are available here; PostgreSQL is excluded.</p></div>
+        <button class="btn" id="refreshServerStatus">Refresh status</button>
+      </div>
+      <div class="grid two-col">
+        <article class="card">
+          <div class="card-head"><div><h2>Service controls</h2><p>Pick the service and action from the menus.</p></div><span class="state" id="serverManagerState"><span class="state-dot"></span>Checking</span></div>
+          <div class="setting-list">
+            <div class="setting-row"><div class="setting-copy"><strong>Connected service</strong><p>Select an application service you want to control.</p></div><div class="setting-control"><select id="serverService"><option value="dashboard">Social Watch Dashboard</option><option value="bot">Social Watch Bot</option></select></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Action</strong><p>Status is read-only. Other actions may interrupt service.</p></div><div class="setting-control"><select id="serverAction"><option value="status">Check status</option><option value="deploy">Deploy latest source</option><option value="redeploy">Redeploy current build</option><option value="restart">Restart service</option><option value="shutdown">Shut down service</option><option value="start">Start / open service</option></select></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Confirm action</strong><p>Required for any action that changes service state.</p></div><div class="setting-control"><label class="keyword-switch"><input id="serverActionConfirm" class="switch" type="checkbox"> I understand</label></div></div>
+          </div>
+          <div class="toolbar section-gap"><button class="btn primary" id="runServerAction">Run action</button><button class="btn" id="clearServerResult">Clear result</button></div>
+          <div id="serverActionResult" class="callout hidden" role="status" aria-live="polite"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><h2>Safety & connection</h2><p>Managed service scope</p></div></div>
+          <div class="setting-list">
+            <div class="setting-row"><div class="setting-copy"><strong>Provider</strong><p>Railway</p></div><span class="state connected"><span class="state-dot"></span>Adapter added</span></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Database protection</strong><p>PostgreSQL is not selectable and will not be controlled by these dropdowns.</p></div><span class="state connected"><span class="state-dot"></span>Excluded</span></div>
+            <div class="setting-row"><div class="setting-copy"><strong>API credentials</strong><p>The dashboard needs its own Railway API token and environment ID before actions can run.</p></div><span class="state" id="serverCredentialState"><span class="state-dot"></span>Checking</span></div>
+          </div>
+          <div class="callout"><strong>Heads up:</strong> shutting down the bot will prevent it from processing keywords until it is started again. Status checks do not require confirmation.</div>
+        </article>
+      </div>
+    </section>
     <section class="view" id="view-integrations">
       <div class="page-head"><div><div class="eyebrow">Connections</div><h1>Integrations</h1><p class="lead">See which services have checked in recently and what's available to connect next.</p></div><button class="btn" id="refreshIntegrations">Refresh status</button></div>
       <div class="grid integration-grid" id="integrationsGrid"><article class="card empty">Checking integrations…</article></div>
@@ -390,6 +420,54 @@ $("newKeyword").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefa
 function testKeywordMessage(){captureKeywordEdits();const sample=$("keywordTestMessage").value.trim();const result=$("keywordTestResult");result.classList.remove("hidden");if(!sample){result.textContent="Enter a sample message to test.";return}const lower=sample.toLowerCase();const matches=(state.config.keywords||[]).filter(rule=>rule.enabled&&rule.term&&lower.includes(rule.term.toLowerCase()));if(!matches.length){result.textContent="No enabled keywords match this sample. The bot would not create an alert for this message.";return}const rank={normal:1,medium:2,high:3};const priority=matches.reduce((best,rule)=>(rank[rule.priority]||1)>(rank[best]||1)?rule.priority:best,"normal");const actionNames={record_only:"Dashboard history only",discord:"Discord channel",nest:"Google Nest",discord_nest:"Discord + Google Nest"};result.textContent="Match: "+matches.map(rule=>rule.term+" → "+(actionNames[rule.action||"discord_nest"]||"Discord + Google Nest")).join("; ")+" · Effective priority: "+priority.toUpperCase()+". Save rules to apply these actions to the running bot."}
 $("testKeywordsBtn").addEventListener("click",testKeywordMessage);
 $("keywordTestMessage").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();testKeywordMessage()}});
+
+async function refreshServerStatus(){
+  try {
+    const info = await api("/api/infrastructure/services");
+    const state = $("serverManagerState");
+    const credentials = $("serverCredentialState");
+    if (info.configured) {
+      state.innerHTML = '<span class="state-dot"></span>Connected';
+      state.className = "state connected";
+      credentials.innerHTML = '<span class="state-dot"></span>Configured';
+      credentials.className = "state connected";
+    } else {
+      state.innerHTML = '<span class="state-dot"></span>Setup needed';
+      state.className = "state error";
+      credentials.innerHTML = '<span class="state-dot"></span>Needs token';
+      credentials.className = "state error";
+    }
+  } catch (error) {
+    $("serverManagerState").textContent = "Unavailable";
+    $("serverCredentialState").textContent = "Unavailable";
+  }
+}
+$("refreshServerStatus").addEventListener("click",()=>refreshServerStatus().then(()=>toast("Server manager status refreshed.")));
+$("clearServerResult").addEventListener("click",()=>{$("serverActionResult").classList.add("hidden");$("serverActionResult").textContent="";});
+$("runServerAction").addEventListener("click",async()=>{
+  const service=$("serverService").value;
+  const action=$("serverAction").value;
+  const confirmChecked=$("serverActionConfirm").checked;
+  if(action!=="status"&&!confirmChecked){
+    toast("Check the confirmation box before running this action.",true);
+    return;
+  }
+  if(action==="shutdown"&&!window.confirm("Shut down this service? It may become unavailable until started again."))return;
+  if(action==="restart"&&!window.confirm("Restart this service? It may be briefly unavailable."))return;
+  if((action==="redeploy"||action==="deploy")&&!window.confirm("Start a deployment for this service?"))return;
+  const button=$("runServerAction");
+  button.disabled=true;button.textContent="Working…";
+  const output=$("serverActionResult");output.classList.remove("hidden");output.textContent="Sending request to Railway…";
+  try{
+    const data=await api("/api/infrastructure/action",{method:"POST",body:JSON.stringify({service,action,confirm:action==="status"||confirmChecked})});
+    output.textContent=data.result.service+" · "+data.result.status;
+    toast("Railway accepted the request.");
+    await refreshServerStatus();
+  }catch(error){output.textContent=error.message;toast(error.message,true)}
+  finally{button.disabled=false;button.textContent="Run action";}
+});
+refreshServerStatus();
+
 function cryptoRandomId(){return"rule-"+Math.random().toString(36).slice(2,10)}
 $("saveKeywordsTop").addEventListener("click",()=>saveConfig("Keyword rules saved. The bot will sync in about 60 seconds."));
 function captureAutomationControls(){const a=state.config.automations;a.discordChannelAlertsEnabled=$("discordAlertsToggle").checked;a.homeAssistantAnnouncementsEnabled=$("nestEnabledToggle").checked;a.nestAnnouncementMode=$("nestMode").value;a.quietHoursEnabled=$("quietEnabledToggle").checked;a.quietHoursStart=$("quietStart").value||"22:00";a.quietHoursEnd=$("quietEnd").value||"07:00";a.timezone=$("timezone").value}
