@@ -5,6 +5,58 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "20kb" }));
 
+const crypto = require("crypto");
+
+function sameSecret(a, b) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function requireLogin(req, res, next) {
+  const username = process.env.DASHBOARD_USER;
+  const password = process.env.DASHBOARD_PASSWORD;
+
+  if (!username || !password) {
+    return res.status(503).send("Dashboard login is not configured.");
+  }
+
+  const header = req.headers.authorization || "";
+
+  if (!header.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Social Watch Dashboard"');
+    return res.status(401).send("Login required.");
+  }
+
+  let credentials;
+
+  try {
+    credentials = Buffer.from(header.slice(6), "base64").toString("utf8");
+  } catch {
+    return res.status(401).send("Invalid login.");
+  }
+
+  const separator = credentials.indexOf(":");
+
+  if (separator < 0) {
+    return res.status(401).send("Invalid login.");
+  }
+
+  const suppliedUser = credentials.slice(0, separator);
+  const suppliedPassword = credentials.slice(separator + 1);
+
+  if (
+    !sameSecret(suppliedUser, username) ||
+    !sameSecret(suppliedPassword, password)
+  ) {
+    res.set("WWW-Authenticate", 'Basic realm="Social Watch Dashboard"');
+    return res.status(401).send("Incorrect username or password.");
+  }
+
+  next();
+}
+
+
 const recentAlerts = [];
 
 const priorities = {
@@ -17,7 +69,7 @@ const priorities = {
   "social watch": "Low"
 };
 
-app.get("/", (req, res) => {
+app.get("/", requireLogin, (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -163,7 +215,7 @@ setInterval(loadAlerts, 5000);
 </html>`);
 });
 
-app.get("/api/alerts", (req, res) => {
+app.get("/api/alerts", requireLogin, async (req, res) => {
   res.set("Cache-Control", "no-store");
   res.json(recentAlerts);
 });
