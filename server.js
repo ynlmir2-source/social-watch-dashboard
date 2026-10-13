@@ -1,20 +1,17 @@
 
 const express = require("express");
 const crypto = require("crypto");
+const path = require("path");
 const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SESSION_COOKIE = "social_watch_session";
+const SESSION_DURATION = 12 * 60 * 60 * 1000;
 
-app.use(express.json({ limit: "20kb" }));
+app.disable("x-powered-by");
+app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
-
-// Required Railway environment variables:
-// DATABASE_URL
-// DASHBOARD_USERNAME
-// DASHBOARD_PASSWORD
-// DASHBOARD_INGEST_KEY
-// SESSION_SECRET
 
 const requiredVariables = [
   "DATABASE_URL",
@@ -26,7 +23,7 @@ const requiredVariables = [
 
 for (const name of requiredVariables) {
   if (!process.env[name]) {
-    console.error(`Missing required environment variable: ${name}`);
+    console.error("Missing required environment variable: " + name);
     process.exit(1);
   }
 }
@@ -41,33 +38,61 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-const SESSION_COOKIE = "social_watch_session";
-const SESSION_DURATION = 12 * 60 * 60 * 1000;
+const DEFAULT_TERMS = [
+  { term: "social watch", priority: "medium", enabled: true },
+  { term: "project update", priority: "normal", enabled: true },
+  { term: "event announcement", priority: "medium", enabled: true },
+  { term: "urgent", priority: "high", enabled: true },
+  { term: "launch", priority: "normal", enabled: true },
+  { term: "settings", priority: "normal", enabled: true },
+  { term: "owner info", priority: "normal", enabled: true },
+];
 
-const KEYWORDS = (process.env.WATCH_KEYWORDS ||
-  "social watch,urgent,announcement")
-  .split(",")
-  .map((word) => word.trim())
-  .filter(Boolean);
+function buildDefaultConfig() {
+  const envWords = (process.env.WATCH_KEYWORDS || "")
+    .split(",")
+    .map((word) => word.trim().toLowerCase())
+    .filter(Boolean);
 
-const PRIORITIES = {
-  urgent: "high",
-  emergency: "high",
-  critical: "high",
-  announcement: "medium",
-  "social watch": "medium",
-};
+  const keywords = envWords.length
+    ? envWords.map((term) => ({
+        id: crypto.randomUUID(),
+        term,
+        priority: /\b(urgent|emergency|critical|immediate)\b/.test(term)
+          ? "high"
+          : /\b(announcement|important|warning)\b/.test(term)
+            ? "medium"
+            : "normal",
+        enabled: true,
+      }))
+    : DEFAULT_TERMS.map((rule) => ({
+        id: crypto.randomUUID(),
+        ...rule,
+      }));
+
+  return {
+    keywords,
+    automations: {
+      discordChannelAlertsEnabled: true,
+      homeAssistantAnnouncementsEnabled: true,
+      nestAnnouncementMode: "all",
+      quietHoursEnabled: false,
+      quietHoursStart: "22:00",
+      quietHoursEnd: "07:00",
+      timezone: "America/New_York",
+    },
+    preferences: {
+      refreshSeconds: 5,
+      browserNotificationsEnabled: false,
+    },
+  };
+}
 
 function safeEqual(a, b) {
-  if (typeof a !== "string" || typeof b !== "string") {
-    return false;
-  }
-
+  if (typeof a !== "string" || typeof b !== "string") return false;
   const x = Buffer.from(a);
   const y = Buffer.from(b);
-
-  return x.length === y.length &&
-    crypto.timingSafeEqual(x, y);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
 function sign(value) {
@@ -78,46 +103,30 @@ function sign(value) {
 }
 
 function createSession(username) {
-  const payload = Buffer.from(
-    JSON.stringify({
-      username,
-      expires: Date.now() + SESSION_DURATION,
-    })
-  ).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    username,
+    expires: Date.now() + SESSION_DURATION,
+  })).toString("base64url");
 
-  return `${payload}.${sign(payload)}`;
+  return payload + "." + sign(payload);
 }
 
 function verifySession(token) {
-  if (!token || typeof token !== "string") {
-    return null;
-  }
-
+  if (!token || typeof token !== "string") return null;
   const parts = token.split(".");
-
-  if (parts.length !== 2) {
-    return null;
-  }
+  if (parts.length !== 2) return null;
 
   const [payload, signature] = parts;
-
-  if (!safeEqual(signature, sign(payload))) {
-    return null;
-  }
+  if (!safeEqual(signature, sign(payload))) return null;
 
   try {
-    const data = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8")
-    );
-
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
     if (
       !data.username ||
       data.username !== process.env.DASHBOARD_USERNAME ||
       !Number.isFinite(data.expires) ||
       data.expires <= Date.now()
-    ) {
-      return null;
-    }
+    ) return null;
 
     return data;
   } catch {
@@ -126,39 +135,31 @@ function verifySession(token) {
 }
 
 function getCookie(req, name) {
-  const cookieHeader = req.headers.cookie || "";
-
-  for (const item of cookieHeader.split(";")) {
+  const header = req.headers.cookie || "";
+  for (const item of header.split(";")) {
     const separator = item.indexOf("=");
-
     if (separator < 0) continue;
-
     const key = item.slice(0, separator).trim();
     const value = item.slice(separator + 1).trim();
-
     if (key === name) {
-      return decodeURIComponent(value);
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return null;
+      }
     }
   }
-
   return null;
 }
 
 function requireLogin(req, res, next) {
-  const session = verifySession(
-    getCookie(req, SESSION_COOKIE)
-  );
-
+  const session = verifySession(getCookie(req, SESSION_COOKIE));
   if (!session) {
     if (req.path.startsWith("/api/")) {
-      return res.status(401).json({
-        error: "Please log in to access the dashboard.",
-      });
+      return res.status(401).json({ error: "Please log in to access the dashboard." });
     }
-
     return res.redirect("/login");
   }
-
   req.user = session;
   next();
 }
@@ -166,41 +167,152 @@ function requireLogin(req, res, next) {
 function requireIngestKey(req, res, next) {
   const authorization = req.get("authorization") || "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
-
-  if (
-    !match ||
-    !safeEqual(match[1], process.env.DASHBOARD_INGEST_KEY)
-  ) {
-    return res.status(401).json({
-      error: "Invalid ingestion credentials.",
-    });
+  if (!match || !safeEqual(match[1], process.env.DASHBOARD_INGEST_KEY)) {
+    return res.status(401).json({ error: "Invalid ingestion credentials." });
   }
-
   next();
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[char]);
+function requireSameOrigin(req, res, next) {
+  const origin = req.get("origin");
+  if (!origin) return next();
+  try {
+    if (new URL(origin).host !== req.get("host")) {
+      return res.status(403).json({ error: "Cross-origin request blocked." });
+    }
+  } catch {
+    return res.status(403).json({ error: "Invalid request origin." });
+  }
+  next();
+}
+
+function isValidTime(value) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function validTimezone(value) {
+  if (typeof value !== "string" || value.length > 80) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeConfig(input, previous) {
+  const source = input && typeof input === "object" ? input : {};
+  const current = previous && typeof previous === "object"
+    ? previous
+    : buildDefaultConfig();
+
+  const incomingKeywords = Array.isArray(source.keywords)
+    ? source.keywords.slice(0, 100)
+    : current.keywords;
+  const seen = new Set();
+  const keywords = [];
+
+  for (const rule of incomingKeywords) {
+    if (!rule || typeof rule !== "object") continue;
+    const term = typeof rule.term === "string"
+      ? rule.term.trim().toLowerCase().slice(0, 80)
+      : "";
+    if (!term || seen.has(term)) continue;
+    seen.add(term);
+
+    const priority = ["normal", "medium", "high"].includes(rule.priority)
+      ? rule.priority
+      : "normal";
+
+    keywords.push({
+      id: typeof rule.id === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(rule.id)
+        ? rule.id
+        : crypto.randomUUID(),
+      term,
+      priority,
+      enabled: rule.enabled !== false,
+    });
+  }
+
+  const incomingAutomation = source.automations && typeof source.automations === "object"
+    ? source.automations
+    : {};
+  const oldAutomation = current.automations || {};
+  const mode = ["all", "medium_high", "high_only", "off"].includes(
+    incomingAutomation.nestAnnouncementMode
+  )
+    ? incomingAutomation.nestAnnouncementMode
+    : (oldAutomation.nestAnnouncementMode || "all");
+  const timezone = validTimezone(incomingAutomation.timezone)
+    ? incomingAutomation.timezone
+    : (oldAutomation.timezone || "America/New_York");
+
+  const automations = {
+    discordChannelAlertsEnabled:
+      typeof incomingAutomation.discordChannelAlertsEnabled === "boolean"
+        ? incomingAutomation.discordChannelAlertsEnabled
+        : oldAutomation.discordChannelAlertsEnabled !== false,
+    homeAssistantAnnouncementsEnabled:
+      typeof incomingAutomation.homeAssistantAnnouncementsEnabled === "boolean"
+        ? incomingAutomation.homeAssistantAnnouncementsEnabled
+        : oldAutomation.homeAssistantAnnouncementsEnabled !== false,
+    nestAnnouncementMode: mode,
+    quietHoursEnabled:
+      typeof incomingAutomation.quietHoursEnabled === "boolean"
+        ? incomingAutomation.quietHoursEnabled
+        : !!oldAutomation.quietHoursEnabled,
+    quietHoursStart: isValidTime(incomingAutomation.quietHoursStart)
+      ? incomingAutomation.quietHoursStart
+      : (oldAutomation.quietHoursStart || "22:00"),
+    quietHoursEnd: isValidTime(incomingAutomation.quietHoursEnd)
+      ? incomingAutomation.quietHoursEnd
+      : (oldAutomation.quietHoursEnd || "07:00"),
+    timezone,
+  };
+
+  const incomingPreferences = source.preferences && typeof source.preferences === "object"
+    ? source.preferences
+    : {};
+  const oldPreferences = current.preferences || {};
+  const candidateRefresh = Number(incomingPreferences.refreshSeconds);
+  const refreshSeconds = [5, 10, 15, 30].includes(candidateRefresh)
+    ? candidateRefresh
+    : ([5, 10, 15, 30].includes(Number(oldPreferences.refreshSeconds))
+      ? Number(oldPreferences.refreshSeconds)
+      : 5);
+
+  return {
+    keywords,
+    automations,
+    preferences: {
+      refreshSeconds,
+      browserNotificationsEnabled:
+        typeof incomingPreferences.browserNotificationsEnabled === "boolean"
+          ? incomingPreferences.browserNotificationsEnabled
+          : !!oldPreferences.browserNotificationsEnabled,
+    },
+  };
 }
 
 function inferPriority(text) {
-  const lower = text.toLowerCase();
-
-  if (/\b(urgent|emergency|critical|immediate)\b/.test(lower)) {
-    return "high";
-  }
-
-  if (/\b(announcement|important|warning)\b/.test(lower)) {
-    return "medium";
-  }
-
+  const lower = String(text || "").toLowerCase();
+  if (/\b(urgent|emergency|critical|immediate)\b/.test(lower)) return "high";
+  if (/\b(announcement|important|warning)\b/.test(lower)) return "medium";
   return "normal";
+}
+
+async function getConfig() {
+  const result = await pool.query(
+    "SELECT config, updated_at FROM social_watch_settings WHERE id = 1"
+  );
+  if (result.rows.length) return result.rows[0];
+
+  const config = buildDefaultConfig();
+  const inserted = await pool.query(
+    "INSERT INTO social_watch_settings (id, config) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id RETURNING config, updated_at",
+    [JSON.stringify(config)]
+  );
+  return inserted.rows[0];
 }
 
 async function initializeDatabase() {
@@ -216,20 +328,64 @@ async function initializeDatabase() {
   `);
 
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS
-    social_watch_alerts_created_at_idx
+    ALTER TABLE social_watch_alerts
+    ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_alerts_created_at_idx
     ON social_watch_alerts (created_at DESC)
   `);
 
-  console.log("PostgreSQL alert storage is ready.");
-}
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_alerts_priority_created_idx
+    ON social_watch_alerts (priority, created_at DESC)
+  `);
 
-app.disable("x-powered-by");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_watch_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      config JSONB NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_watch_integrations (
+      service_key TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'unknown',
+      last_seen TIMESTAMPTZ,
+      details JSONB NOT NULL DEFAULT '{}'::jsonb
+    )
+  `);
+
+  const defaults = buildDefaultConfig();
+  await pool.query(
+    `INSERT INTO social_watch_settings (id, config)
+      VALUES (1, $1::jsonb)
+      ON CONFLICT (id) DO NOTHING`,
+    [JSON.stringify(defaults)]
+  );
+
+  await pool.query(
+    `INSERT INTO social_watch_integrations
+       (service_key, display_name, status, last_seen, details)
+     VALUES ('dashboard', 'Dashboard API + PostgreSQL', 'connected', NOW(), '{}'::jsonb)
+     ON CONFLICT (service_key)
+     DO UPDATE SET display_name = EXCLUDED.display_name,
+                   status = 'connected',
+                   last_seen = NOW()`
+  );
+
+  console.log("PostgreSQL alert storage, settings, and integration tracking are ready.");
+}
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("Cache-Control", "no-store");
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
@@ -240,300 +396,411 @@ app.use((req, res, next) => {
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
-
-    res.json({
-      status: "ok",
-      database: "connected",
-      service: "Social Watch Dashboard",
-    });
+    res.json({ status: "ok", database: "connected", service: "Social Watch Dashboard" });
   } catch (error) {
     console.error("Health check failed:", error.message);
-
-    res.status(503).json({
-      status: "error",
-      database: "unavailable",
-    });
+    res.status(503).json({ status: "error", database: "unavailable" });
   }
 });
 
 app.get("/login", (req, res) => {
-  if (verifySession(getCookie(req, SESSION_COOKIE))) {
-    return res.redirect("/");
-  }
-
-  res.setHeader("Cache-Control", "no-store");
-
+  if (verifySession(getCookie(req, SESSION_COOKIE))) return res.redirect("/");
   res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Social Watch — Login</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Social Watch — Login</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;
-background:#0b1020;color:#f3f4f6;font-family:Arial,sans-serif;padding:20px}
-.card{width:100%;max-width:390px;background:#151c30;padding:30px;
-border:1px solid #303b55;border-radius:18px}
-h1{margin-top:0}p{color:#aeb9ce;line-height:1.5}
-input,button{width:100%;padding:13px;margin-top:12px;border-radius:9px;
-font-size:16px}
-input{background:#0b1020;color:white;border:1px solid #3b4760}
-button{border:0;background:#6d75f9;color:white;font-weight:bold;cursor:pointer}
-#error{color:#ff9292}
-</style>
-</head>
-<body>
-<main class="card">
-<h1>Social Watch</h1>
-<p>Sign in to access your monitoring dashboard.</p>
-<form method="POST" action="/login">
-<label for="username">Username</label>
-<input id="username" name="username" autocomplete="username" required>
-<label for="password">Password</label>
-<input id="password" name="password" type="password"
-autocomplete="current-password" required>
-<button type="submit">Sign in</button>
-<p id="error" role="alert"></p>
-</form>
-</main>
-<script>
-if(new URLSearchParams(location.search).has("error")){
-document.getElementById("error").textContent="Login failed. Check your credentials.";
-}
-</script>
-</body>
-</html>`);
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(700px 340px at 80% 0,#1c2a4a 0,transparent 70%),#0b1120;color:#edf3ff;font-family:Arial,sans-serif;padding:20px}.card{width:100%;max-width:410px;background:#111a2d;padding:32px;border:1px solid #263550;border-radius:18px;box-shadow:0 25px 70px #0003}.brand{font-size:23px;font-weight:800;margin-bottom:6px}.muted{color:#91a3bd;line-height:1.6;font-size:13px}label{display:block;font-size:12px;margin-top:18px}input,button{width:100%;padding:13px;margin-top:8px;border-radius:9px;font-size:14px}input{background:#0b1322;color:white;border:1px solid #34445f}button{border:0;background:#8591f5;color:#0b1120;font-weight:bold;cursor:pointer;margin-top:22px}#error{color:#ff9292}</style></head><body><main class="card"><div class="brand">◎ Social Watch</div><p class="muted">Sign in to open your monitoring control center.</p><form method="POST" action="/login"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button><p id="error" role="alert"></p></form></main><script>if(new URLSearchParams(location.search).has("error"))document.getElementById("error").textContent="Login failed. Check your credentials."</script></body></html>`);
 });
 
 app.post("/login", (req, res) => {
   const username = String(req.body.username || "");
   const password = String(req.body.password || "");
-
   if (
     !safeEqual(username, process.env.DASHBOARD_USERNAME) ||
     !safeEqual(password, process.env.DASHBOARD_PASSWORD)
-  ) {
-    return res.redirect(303, "/login?error=1");
-  }
+  ) return res.redirect(303, "/login?error=1");
 
   const token = createSession(username);
-  const secure = process.env.COOKIE_SECURE === "false"
-    ? ""
-    : "; Secure";
-
-  res.setHeader("Cache-Control", "no-store");
+  const secure = process.env.COOKIE_SECURE === "false" ? "" : "; Secure";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DURATION / 1000}${secure}`
+    SESSION_COOKIE + "=" + encodeURIComponent(token) +
+    "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + (SESSION_DURATION / 1000) + secure
   );
-
   res.redirect(303, "/");
 });
 
 app.post("/logout", requireLogin, (req, res) => {
-  const secure = process.env.COOKIE_SECURE === "false"
-    ? ""
-    : "; Secure";
-
+  const secure = process.env.COOKIE_SECURE === "false" ? "" : "; Secure";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`
+    SESSION_COOKIE + "=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0" + secure
   );
-
   res.redirect(303, "/login");
 });
 
 app.get("/", requireLogin, (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Social Watch Dashboard</title>
-<style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#0b1020;color:#f3f4f6;
-font-family:Arial,sans-serif}
-header{padding:22px 5%;border-bottom:1px solid #283149;
-display:flex;justify-content:space-between;align-items:center;gap:15px}
-h1{margin:0;font-size:25px}
-main{max-width:1100px;margin:auto;padding:25px 20px}
-.muted{color:#9caac2}
-.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
-gap:14px;margin:22px 0}
-.stat,.alert{background:#151c30;border:1px solid #2b3650;
-border-radius:12px;padding:18px}
-.stat strong{display:block;font-size:27px;margin-top:9px}
-.alerts{display:grid;gap:12px}
-.alert-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.priority{font-size:12px;text-transform:uppercase;font-weight:bold}
-.high{color:#ff8585}.medium{color:#ffd479}.normal{color:#8de5bb}
-.message{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
-button{cursor:pointer;border:1px solid #3b4760;border-radius:8px;
-background:#202a43;color:white;padding:10px 14px}
-button:hover{background:#303d5b}
-#status{min-height:22px}
-@media(max-width:600px){.stats{grid-template-columns:1fr}header{align-items:flex-start}}
-</style>
-</head>
-<body>
-<header>
-<div><h1>Social Watch</h1><p class="muted">Monitoring dashboard</p></div>
-<form method="POST" action="/logout"><button type="submit">Log out</button></form>
-</header>
-<main>
-<p id="status" class="muted">Connecting to alert storage…</p>
-<div class="stats">
-<div class="stat"><span class="muted">Total alerts</span><strong id="total">0</strong></div>
-<div class="stat"><span class="muted">High priority</span><strong id="high">0</strong></div>
-<div class="stat"><span class="muted">Last update</span><strong id="updated" style="font-size:17px">—</strong></div>
-</div>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px">
-<h2>Recent alerts</h2><button id="refresh" type="button">Refresh</button>
-</div>
-<div id="alerts" class="alerts"></div>
-<p class="muted">The dashboard checks for new alerts every 5 seconds.</p>
-</main>
-<script>
-const alertsNode=document.getElementById("alerts");
-const statusNode=document.getElementById("status");
-const escapeHtml=(value)=>String(value??"").replace(/[&<>"']/g,c=>({
-"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-})[c]);
-
-async function refreshAlerts(){
- try{
-  const response=await fetch("/api/alerts?limit=100",{cache:"no-store"});
-  if(response.status===401){location.href="/login";return}
-  if(!response.ok)throw new Error("HTTP "+response.status);
-  const data=await response.json();
-  const alerts=data.alerts||[];
-  document.getElementById("total").textContent=data.total??alerts.length;
-  document.getElementById("high").textContent=alerts.filter(a=>a.priority==="high").length;
-  document.getElementById("updated").textContent=new Date().toLocaleTimeString();
-  alertsNode.innerHTML=alerts.length?alerts.map(a=>{
-   const priority=["high","medium","normal"].includes(a.priority)?a.priority:"normal";
-   return '<article class="alert"><div class="alert-top"><strong>'+
-   escapeHtml(a.source)+'</strong><span class="priority '+priority+'">'+
-   escapeHtml(priority)+'</span></div><p class="message">'+
-   escapeHtml(a.message)+'</p><p class="muted">'+
-   escapeHtml(a.keyword||"No keyword recorded")+' · '+
-   escapeHtml(new Date(a.created_at).toLocaleString())+
-   '</p></article>';
-  }).join(""):'<div class="alert">No alerts yet. Social Watch is waiting for incoming alerts.</div>';
-  statusNode.textContent="Connected · "+alerts.length+" recent alerts loaded";
- }catch(error){
-  statusNode.textContent="Unable to load alerts. Retrying automatically.";
- }
-}
-document.getElementById("refresh").addEventListener("click",refreshAlerts);
-refreshAlerts();
-setInterval(refreshAlerts,5000);
-</script>
-</body>
-</html>`);
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Dashboard API: only authenticated dashboard users can read alerts.
+app.get("/api/dashboard/summary", requireLogin, async (req, res) => {
+  try {
+    const [counts, activity, connections] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE is_read = FALSE)::int AS unread,
+          COUNT(*) FILTER (
+            WHERE priority = 'high'
+            AND created_at >= NOW() - INTERVAL '24 hours'
+          )::int AS high_priority_24h
+        FROM social_watch_alerts
+      `),
+      pool.query(`
+        SELECT
+          day::date AS day,
+          TO_CHAR(day, 'Dy') AS label,
+          COUNT(a.id)::int AS count
+        FROM generate_series(
+          CURRENT_DATE - INTERVAL '6 days',
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        ) AS day
+        LEFT JOIN social_watch_alerts a
+          ON a.created_at >= day
+         AND a.created_at < day + INTERVAL '1 day'
+        GROUP BY day
+        ORDER BY day
+      `),
+      pool.query(`
+        SELECT COUNT(*)::int AS connected
+        FROM social_watch_integrations
+        WHERE status = 'connected'
+          AND (
+            service_key = 'dashboard'
+            OR last_seen >= NOW() - INTERVAL '3 minutes'
+          )
+      `),
+    ]);
+
+    res.json({
+      ...counts.rows[0],
+      highPriority24h: counts.rows[0].high_priority_24h,
+      connectedServices: connections.rows[0].connected,
+      activity: activity.rows.map((row) => ({
+        day: row.day,
+        label: row.label,
+        count: row.count,
+      })),
+    });
+  } catch (error) {
+    console.error("Dashboard summary failed:", error.message);
+    res.status(500).json({ error: "Unable to load dashboard summary." });
+  }
+});
+
+app.get("/api/settings", requireLogin, async (req, res) => {
+  try {
+    const row = await getConfig();
+    res.json({ config: row.config, updatedAt: row.updated_at });
+  } catch (error) {
+    console.error("Could not load settings:", error.message);
+    res.status(500).json({ error: "Unable to load settings." });
+  }
+});
+
+app.put("/api/settings", requireLogin, requireSameOrigin, async (req, res) => {
+  try {
+    if (!req.body || !req.body.config || typeof req.body.config !== "object") {
+      return res.status(400).json({ error: "A config object is required." });
+    }
+
+    const row = await getConfig();
+    const config = normalizeConfig(req.body.config, row.config);
+    const result = await pool.query(
+      `UPDATE social_watch_settings
+       SET config = $1::jsonb, updated_at = NOW()
+       WHERE id = 1
+       RETURNING config, updated_at`,
+      [JSON.stringify(config)]
+    );
+
+    res.json({
+      success: true,
+      config: result.rows[0].config,
+      updatedAt: result.rows[0].updated_at,
+    });
+  } catch (error) {
+    console.error("Could not save settings:", error.message);
+    res.status(500).json({ error: "Unable to save settings." });
+  }
+});
+
+// Authenticated bot endpoint: returns rules and automation preferences, never secrets.
+app.get("/api/bot-config", requireIngestKey, async (req, res) => {
+  try {
+    const row = await getConfig();
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      keywords: (row.config.keywords || [])
+        .filter((rule) => rule.enabled)
+        .map(({ term, priority }) => ({ term, priority })),
+      automations: row.config.automations,
+      updatedAt: row.updated_at,
+    });
+  } catch (error) {
+    console.error("Bot config request failed:", error.message);
+    res.status(500).json({ error: "Unable to load bot configuration." });
+  }
+});
+
+app.post("/api/integrations/heartbeat", requireIngestKey, async (req, res) => {
+  const service = String(req.body?.service || "");
+  const status = String(req.body?.status || "connected");
+  const services = {
+    discord_bot: "Discord monitoring bot",
+    home_assistant: "Home Assistant / Google Nest",
+  };
+
+  if (!services[service]) {
+    return res.status(400).json({ error: "Unsupported integration service." });
+  }
+  if (!["connected", "error"].includes(status)) {
+    return res.status(400).json({ error: "Invalid integration status." });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO social_watch_integrations
+        (service_key, display_name, status, last_seen, details)
+       VALUES ($1, $2, $3, NOW(), '{}'::jsonb)
+       ON CONFLICT (service_key) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         status = EXCLUDED.status,
+         last_seen = NOW()`,
+      [service, services[service], status]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Integration heartbeat failed:", error.message);
+    res.status(500).json({ error: "Unable to record integration status." });
+  }
+});
+
+app.get("/api/integrations", requireLogin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT service_key, display_name, status, last_seen
+       FROM social_watch_integrations
+       ORDER BY CASE service_key
+         WHEN 'dashboard' THEN 1
+         WHEN 'discord_bot' THEN 2
+         WHEN 'home_assistant' THEN 3
+         ELSE 4
+       END`
+    );
+
+    const existing = new Map(result.rows.map((row) => [row.service_key, row]));
+    const tracked = [
+      { key: "dashboard", name: "Dashboard API + PostgreSQL", type: "Core service", description: "Dashboard, settings API, and PostgreSQL alert storage." },
+      { key: "discord_bot", name: "Discord monitoring bot", type: "Alert source", description: "Keyword monitoring and Discord alert delivery." },
+      { key: "home_assistant", name: "Home Assistant / Google Nest", type: "Announcement route", description: "Home Assistant webhook and Google Assistant SDK announcement route." },
+    ];
+
+    res.json({
+      integrations: tracked.map((item) => {
+        const found = existing.get(item.key);
+        return {
+          ...item,
+          status: found ? found.status : "not_connected",
+          last_seen: found ? found.last_seen : null,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error("Integration status failed:", error.message);
+    res.status(500).json({ error: "Unable to load integrations." });
+  }
+});
+
 app.get("/api/alerts", requireLogin, async (req, res) => {
   try {
     const parsedLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(parsedLimit, 1), 100)
-      : 50;
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+    const parsedOffset = Number.parseInt(req.query.offset, 10);
+    const offset = Number.isFinite(parsedOffset) ? Math.max(0, Math.min(parsedOffset, 1000000)) : 0;
+    const where = [];
+    const values = [];
 
-    const [alertsResult, countResult] = await Promise.all([
-      pool.query(
-        `SELECT id, message, source, priority, keyword, created_at
-         FROM social_watch_alerts
-         ORDER BY created_at DESC, id DESC
-         LIMIT $1`,
-        [limit]
-      ),
-      pool.query(
-        "SELECT COUNT(*)::int AS total FROM social_watch_alerts"
-      ),
-    ]);
+    if (typeof req.query.search === "string" && req.query.search.trim()) {
+      values.push("%" + req.query.search.trim().slice(0, 120) + "%");
+      const p = "$" + values.length;
+      where.push("(message ILIKE " + p + " OR source ILIKE " + p + " OR COALESCE(keyword, '') ILIKE " + p + ")");
+    }
+    if (["high", "medium", "normal"].includes(String(req.query.priority || ""))) {
+      values.push(String(req.query.priority));
+      where.push("priority = $" + values.length);
+    }
+    if (req.query.status === "unread") where.push("is_read = FALSE");
+    if (req.query.status === "read") where.push("is_read = TRUE");
 
-    res.setHeader("Cache-Control", "no-store");
-    res.json({
-      alerts: alertsResult.rows,
-      total: countResult.rows[0].total,
-    });
+    const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM social_watch_alerts " + whereSql,
+      values
+    );
+    const pageValues = [...values, limit, offset];
+    const result = await pool.query(
+      `SELECT id, message, source, priority, keyword, created_at, is_read
+       FROM social_watch_alerts
+       ` + whereSql + `
+       ORDER BY created_at DESC, id DESC
+       LIMIT $` + (values.length + 1) + ` OFFSET $` + (values.length + 2),
+      pageValues
+    );
+
+    res.json({ alerts: result.rows, total: countResult.rows[0].total, limit, offset });
   } catch (error) {
     console.error("Failed to read alerts:", error.message);
     res.status(500).json({ error: "Unable to load alerts." });
   }
 });
 
-// Alert ingestion: used by your bot or other trusted automation.
-app.post(
-  "/api/alerts",
-  requireIngestKey,
-  async (req, res) => {
-    try {
-      const message = typeof req.body.message === "string"
-        ? req.body.message.trim()
-        : "";
+app.patch("/api/alerts/:id/read", requireLogin, requireSameOrigin, async (req, res) => {
+  const id = String(req.params.id || "");
+  if (!/^\d{1,18}$/.test(id)) return res.status(400).json({ error: "Invalid alert ID." });
 
-      const source = typeof req.body.source === "string"
-        ? req.body.source.trim().slice(0, 150)
-        : "Unknown";
-
-      const keyword = typeof req.body.keyword === "string"
-        ? req.body.keyword.trim().slice(0, 150)
-        : "";
-
-      if (!message || message.length > 10000) {
-        return res.status(400).json({
-          error: "Message is required and must be at most 10000 characters.",
-        });
-      }
-
-      const suppliedPriority = String(req.body.priority || "").toLowerCase();
-
-      const priority = ["high", "medium", "normal"].includes(suppliedPriority)
-        ? suppliedPriority
-        : inferPriority(message);
-
-      const result = await pool.query(
-        `INSERT INTO social_watch_alerts
-         (message, source, priority, keyword)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, message, source, priority, keyword, created_at`,
-        [message, source || "Unknown", priority, keyword || null]
-      );
-
-      res.status(201).json({
-        success: true,
-        alert: result.rows[0],
-      });
-    } catch (error) {
-      console.error("Failed to save alert:", error.message);
-      res.status(500).json({ error: "Unable to save alert." });
-    }
+  try {
+    const result = await pool.query(
+      "UPDATE social_watch_alerts SET is_read = TRUE WHERE id = $1 RETURNING id",
+      [id]
+    );
+    if (!result.rowCount) return res.status(404).json({ error: "Alert not found." });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Mark read failed:", error.message);
+    res.status(500).json({ error: "Unable to update alert." });
   }
-);
+});
 
-// Keep the keyword configuration available to the authenticated dashboard.
-app.get("/api/config", requireLogin, (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.json({ keywords: KEYWORDS });
+app.post("/api/alerts/bulk-read", requireLogin, requireSameOrigin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "UPDATE social_watch_alerts SET is_read = TRUE WHERE is_read = FALSE"
+    );
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    console.error("Bulk mark read failed:", error.message);
+    res.status(500).json({ error: "Unable to update alerts." });
+  }
+});
+
+app.delete("/api/alerts/:id", requireLogin, requireSameOrigin, async (req, res) => {
+  const id = String(req.params.id || "");
+  if (!/^\d{1,18}$/.test(id)) return res.status(400).json({ error: "Invalid alert ID." });
+
+  try {
+    const result = await pool.query("DELETE FROM social_watch_alerts WHERE id = $1 RETURNING id", [id]);
+    if (!result.rowCount) return res.status(404).json({ error: "Alert not found." });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Delete alert failed:", error.message);
+    res.status(500).json({ error: "Unable to delete alert." });
+  }
+});
+
+app.post("/api/alerts/bulk-read", requireLogin, requireSameOrigin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "UPDATE social_watch_alerts SET is_read = TRUE WHERE is_read = FALSE"
+    );
+    res.json({ success: true, updated: result.rowCount });
+  } catch (error) {
+    console.error("Bulk mark read failed:", error.message);
+    res.status(500).json({ error: "Unable to update alerts." });
+  }
+});
+
+app.post("/api/alerts/test", requireLogin, requireSameOrigin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `INSERT INTO social_watch_alerts
+        (message, source, priority, keyword, is_read)
+       VALUES ($1, $2, $3, $4, FALSE)
+       RETURNING id, message, source, priority, keyword, created_at, is_read`,
+      [
+        "This is a dashboard storage test. It does not send a Google Nest announcement.",
+        "Dashboard Test",
+        "normal",
+        "test",
+      ]
+    );
+    res.status(201).json({ success: true, alert: result.rows[0] });
+  } catch (error) {
+    console.error("Test alert failed:", error.message);
+    res.status(500).json({ error: "Unable to create test alert." });
+  }
+});
+
+app.get("/api/config", requireLogin, async (req, res) => {
+  try {
+    const row = await getConfig();
+    res.json({
+      keywords: (row.config.keywords || [])
+        .filter((rule) => rule.enabled)
+        .map((rule) => rule.term),
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to load configuration." });
+  }
+});
+
+app.post("/api/alerts", requireIngestKey, async (req, res) => {
+  try {
+    const message = typeof req.body.message === "string" ? req.body.message.trim() : "";
+    const source = typeof req.body.source === "string" ? req.body.source.trim().slice(0, 150) : "Unknown";
+    const keyword = typeof req.body.keyword === "string" ? req.body.keyword.trim().slice(0, 150) : "";
+
+    if (!message || message.length > 10000) {
+      return res.status(400).json({ error: "Message is required and must be at most 10000 characters." });
+    }
+
+    const suppliedPriority = String(req.body.priority || "").toLowerCase();
+    const priority = ["high", "medium", "normal"].includes(suppliedPriority)
+      ? suppliedPriority
+      : inferPriority(message);
+
+    const result = await pool.query(
+      `INSERT INTO social_watch_alerts
+        (message, source, priority, keyword, is_read)
+       VALUES ($1, $2, $3, $4, FALSE)
+       RETURNING id, message, source, priority, keyword, created_at, is_read`,
+      [message, source || "Unknown", priority, keyword || null]
+    );
+
+    await pool.query(
+      `INSERT INTO social_watch_integrations
+        (service_key, display_name, status, last_seen, details)
+       VALUES ('discord_bot', 'Discord monitoring bot', 'connected', NOW(), '{}'::jsonb)
+       ON CONFLICT (service_key) DO UPDATE SET
+         status = 'connected', last_seen = NOW()`
+    ).catch((error) => console.error("Integration update failed:", error.message));
+
+    res.status(201).json({ success: true, alert: result.rows[0] });
+  } catch (error) {
+    console.error("Failed to save alert:", error.message);
+    res.status(500).json({ error: "Unable to save alert." });
+  }
 });
 
 app.use((req, res) => {
-  res.status(404).json({ error: "Not found." });
+  if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found." });
+  res.status(404).send("Page not found.");
 });
 
 async function start() {
   await initializeDatabase();
-
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Social Watch dashboard listening on port ${PORT}`);
+    console.log("Social Watch dashboard listening on port " + PORT);
   });
 }
 
