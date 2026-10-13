@@ -290,8 +290,18 @@ function normalizeConfig(input, previous) {
         typeof incomingPreferences.browserNotificationsEnabled === "boolean"
           ? incomingPreferences.browserNotificationsEnabled
           : !!oldPreferences.browserNotificationsEnabled,
+      accentIntensity: clampPreference(incomingPreferences.accentIntensity, oldPreferences.accentIntensity, 75, 20, 100),
+      glowIntensity: clampPreference(incomingPreferences.glowIntensity, oldPreferences.glowIntensity, 25, 0, 100),
+      motionIntensity: clampPreference(incomingPreferences.motionIntensity, oldPreferences.motionIntensity, 30, 0, 100),
     },
   };
+}
+
+function clampPreference(incoming, previous, fallback, min, max) {
+  const value = Number(incoming);
+  if (Number.isFinite(value)) return Math.min(max, Math.max(min, Math.round(value)));
+  const old = Number(previous);
+  return Number.isFinite(old) ? Math.min(max, Math.max(min, Math.round(old))) : fallback;
 }
 
 function inferPriority(text) {
