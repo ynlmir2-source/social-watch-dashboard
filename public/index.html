@@ -320,7 +320,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
           <div class="setting-list">
             <div class="setting-row"><div class="setting-copy"><strong>Connected service</strong><p>Select an application service you want to control.</p></div><div class="setting-control"><select id="serverService"><option value="dashboard">Social Watch Dashboard</option><option value="bot">Social Watch Bot</option></select></div></div>
             <div class="setting-row"><div class="setting-copy"><strong>Action</strong><p>Status is read-only. Other actions may interrupt service.</p></div><div class="setting-control"><select id="serverAction"><option value="status">Check status</option><option value="deploy">Deploy latest source</option><option value="redeploy">Redeploy current build</option><option value="restart">Restart service</option><option value="shutdown">Shut down service</option><option value="start">Start / open service</option></select></div></div>
-            <div class="setting-row"><div class="setting-copy"><strong>Confirm action</strong><p>Required for any action that changes service state.</p></div><div class="setting-control"><label class="keyword-switch"><input id="serverActionConfirm" class="switch" type="checkbox"> I understand</label></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Action confirmation</strong><p>The API request automatically sends confirm: true. Your browser will still ask before shutdown, restart, or deployment.</p></div><div class="setting-control"><span class="state"><span class="state-dot"></span>Automatic</span></div></div>
           </div>
           <div class="toolbar section-gap"><button class="btn primary" id="runServerAction">Run action</button><button class="btn" id="clearServerResult">Clear result</button></div>
           <div id="serverActionResult" class="callout hidden" role="status" aria-live="polite"></div>
@@ -459,7 +459,7 @@ $("runServerAction").addEventListener("click",async()=>{
   button.disabled=true;button.textContent="Working…";
   const output=$("serverActionResult");output.classList.remove("hidden");output.textContent="Sending request to Railway…";
   try{
-    const data=await api("/api/infrastructure/action",{method:"POST",body:JSON.stringify({service,action,confirm:action==="status"||confirmChecked})});
+    const data=await api("/api/infrastructure/action",{method:"POST",body:JSON.stringify({service,action,confirm:true})});
     output.textContent=data.result.service+" · "+data.result.status;
     toast("Railway accepted the request.");
     await refreshServerStatus();
