@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1120">
+<title>Social Watch Control Center</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1120;--panel:#111a2d;--panel2:#172238;--line:#263550;--text:#edf3ff;--muted:#91a3bd;--accent:#8b9cff;--accent2:#6ee7d2;--red:#ff7f92;--amber:#ffcf70;--green:#62d9ad;--radius:17px}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(900px 400px at 70% -8%,#192849 0,transparent 65%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);min-height:100vh}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{padding:25px 16px;border-right:1px solid var(--line);background:rgba(8,14,27,.8);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:28px}
+.brand{display:flex;gap:12px;align-items:center;padding:0 8px}
+.brand-mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#9aa6ff,#5b6be6);color:#0b1225;font-size:22px;font-weight:900;box-shadow:0 8px 28px #5365dc38}
+.brand-title{font-weight:800;font-size:17px;letter-spacing:-.4px}.brand-sub{font-size:11px;letter-spacing:1.8px;color:var(--muted);margin-top:3px}
+.nav-label{font-size:10px;text-transform:uppercase;letter-spacing:1.7px;font-weight:800;color:#627590;padding:0 12px 8px}
+nav{display:grid;gap:6px}
+.nav-btn{border:1px solid transparent;background:transparent;color:#9fb0c9;border-radius:11px;padding:11px 12px;display:flex;gap:12px;align-items:center;text-align:left;width:100%;font-size:13px;transition:.15s}
+.nav-btn .nav-icon{width:21px;text-align:center;font-size:16px}
+.nav-btn:hover{background:#152039;color:var(--text)}
+.nav-btn.active{background:#202c4b;border-color:#33466e;color:#fff;box-shadow:inset 3px 0 #97a5ff}
+.nav-count{margin-left:auto;border-radius:8px;padding:2px 7px;background:#293a5b;color:#d3dcff;font-size:11px}
+.side-bottom{margin-top:auto;background:#111b30;border:1px solid var(--line);border-radius:14px;padding:13px}
+.pulse-dot{display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 0 4px #62d9ad19;margin-right:8px}
+.side-bottom strong{font-size:12px}.side-bottom p{color:var(--muted);font-size:11px;line-height:1.5;margin:7px 0 0}
+.main{min-width:0}
+.topbar{height:76px;border-bottom:1px solid #202d45;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,4vw,48px);gap:18px;background:#0b1120cc;backdrop-filter:blur(12px);position:sticky;top:0;z-index:5}
+.top-title{font-size:16px;font-weight:750}.top-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.top-actions{display:flex;align-items:center;gap:9px}
+.status-chip{display:inline-flex;gap:7px;align-items:center;border:1px solid #244b46;color:#9bf1d4;background:#112b2b;border-radius:999px;padding:7px 10px;font-size:11px;white-space:nowrap}
+.icon-btn,.btn{border:1px solid #34445f;background:#18243a;color:#e6edff;border-radius:10px;padding:10px 13px;font-size:12px;font-weight:700;transition:.15s}
+.icon-btn{width:39px;height:39px;padding:0;font-size:16px}
+.btn:hover,.icon-btn:hover{background:#263653;border-color:#51658a}
+.btn.primary{background:#7785f3;border-color:#7785f3;color:#091126}
+.btn.primary:hover{background:#9aa4ff}
+.btn.ghost{background:transparent}
+.btn.danger{background:#3b202d;border-color:#623446;color:#ffb2c0}
+.content{max-width:1480px;margin:0 auto;padding:28px clamp(18px,4vw,48px) 56px}
+.view{display:none;animation:fade .18s ease}.view.active{display:block}
+@keyframes fade{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:25px}
+.eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--accent2);text-transform:uppercase;margin-bottom:10px}
+h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;margin-bottom:9px}h2{font-size:17px;letter-spacing:-.3px;margin:0}h3{font-size:14px;margin:0}
+.lead{max-width:680px;color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:0}
+.grid{display:grid;gap:16px}.stats-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px}
+.card{background:linear-gradient(145deg,#131e33,#10192a);border:1px solid var(--line);border-radius:var(--radius);padding:19px;min-width:0;box-shadow:0 12px 28px #0000000d}
+.stat-card{position:relative;overflow:hidden;padding:19px 20px}.stat-top{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
+.stat-icon{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:#273452;color:#b3beff;font-size:16px}
+.stat-number{font-size:30px;font-weight:800;letter-spacing:-1.5px;margin:15px 0 5px}
+.stat-foot{font-size:11px;color:var(--muted)}.stat-foot.good{color:var(--green)}
+.two-col{grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);margin-top:18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:19px}
+.card-head p{color:var(--muted);font-size:12px;margin:6px 0 0}
+.text-link{border:0;background:transparent;color:#aab6ff;font-size:12px;font-weight:750;padding:6px}
+.activity-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;align-items:end;height:165px;padding-top:12px}
+.day-col{display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;gap:9px}
+.bar-area{height:126px;display:flex;align-items:end;width:100%;max-width:36px}
+.bar{width:100%;min-height:4px;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,#9ea9ff,#6472df);box-shadow:0 5px 20px #6978e92a}
+.day-label{font-size:10px;color:var(--muted)}.day-value{font-size:10px;color:#cbd5ed}
+.feed{display:grid;gap:0}
+.feed-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 0;border-bottom:1px solid #24314a}
+.feed-row:last-child{border-bottom:0}.feed-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--accent)}
+.feed-title{font-size:12px;font-weight:750;line-height:1.5;overflow-wrap:anywhere}.feed-meta{color:var(--muted);font-size:10px;line-height:1.6;margin-top:5px}
+.priority{font-size:9px;font-weight:850;letter-spacing:.8px;text-transform:uppercase;border-radius:7px;padding:5px 7px;white-space:nowrap}
+.priority.high{background:#442633;color:#ff9eaf}.priority.medium{background:#413522;color:#ffd68b}.priority.normal{background:#1c3c39;color:#9af0d6}
+.unread-mark{width:6px;height:6px;border-radius:50%;background:#9aa5ff;display:inline-block;margin-right:5px}
+.empty{padding:32px 14px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+.quick-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px}
+.quick-card{display:flex;align-items:flex-start;gap:13px;cursor:pointer;transition:.16s}
+.quick-card:hover{border-color:#5267a0;transform:translateY(-1px)}
+.quick-icon{height:39px;width:39px;border-radius:12px;display:grid;place-items:center;background:#263452;color:#c1c9ff;flex-shrink:0}
+.quick-card p{font-size:11px;color:var(--muted);line-height:1.6;margin:7px 0 0}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.control,input[type=text],input[type=time],select,textarea{border:1px solid #34445f;background:#0d1627;color:var(--text);border-radius:9px;padding:10px 11px;outline:none;min-width:0}
+.control:focus,input:focus,select:focus,textarea:focus{border-color:#7d8df4;box-shadow:0 0 0 3px #7785f31d}
+.search{flex:1;min-width:180px}
+.alert-list{display:grid;gap:11px}
+.alert-card{padding:17px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.alert-card.unread{border-left:3px solid #8897ff}
+.alert-card h3{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.alert-message{white-space:pre-wrap;overflow-wrap:anywhere;color:#cad5e8;font-size:12px;line-height:1.7;margin:10px 0}
+.alert-card-foot{display:flex;gap:9px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:10px}
+.alert-actions{display:flex;gap:7px;align-items:flex-start}
+.small-btn{border:1px solid #33435c;background:#1b2941;color:#dfe8ff;border-radius:8px;padding:7px 9px;font-size:10px;font-weight:750}
+.small-btn:hover{background:#30415f}.small-btn.danger{color:#ffadb9}
+.keyword-list{display:grid;gap:9px}
+.keyword-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 100px 36px;gap:10px;align-items:center;padding:12px;background:#101a2d;border:1px solid #273650;border-radius:12px}
+.keyword-term{display:flex;align-items:center;gap:10px;min-width:0}
+.keyword-term input{width:100%;min-width:0}
+.keyword-switch{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px}
+.switch{appearance:none;width:34px;height:19px;border-radius:99px;background:#34445c;position:relative;cursor:pointer;flex-shrink:0;transition:.15s}
+.switch:after{content:"";position:absolute;width:13px;height:13px;left:3px;top:3px;border-radius:50%;background:#cad4e5;transition:.15s}
+.switch:checked{background:#6d7ae9}.switch:checked:after{left:18px;background:white}
+.form-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.form-row input[type=text]{flex:1;min-width:160px}
+.form-row select{min-width:130px}
+.rule-foot{color:var(--muted);font-size:11px;line-height:1.7;margin:14px 0 0}
+.section-gap{margin-top:17px}
+.setting-list{display:grid;gap:0}
+.setting-row{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:15px 0;border-bottom:1px solid #283650}
+.setting-row:last-child{border-bottom:0}
+.setting-copy{max-width:690px}.setting-copy strong{display:block;font-size:12px}.setting-copy p{margin:5px 0 0;color:var(--muted);font-size:11px;line-height:1.6}
+.setting-control{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.setting-control select{min-width:145px}
+.callout{border:1px solid #36466a;background:#151f37;border-radius:12px;padding:14px;color:#c4d0e9;font-size:11px;line-height:1.7;margin-top:14px}
+.callout strong{color:#f0f4ff}
+.integration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.integration-card{display:flex;flex-direction:column;gap:16px}
+.integration-top{display:flex;gap:12px;align-items:center}
+.integration-icon{width:44px;height:44px;border-radius:13px;background:#253351;display:grid;place-items:center;font-size:19px}
+.integration-title{font-weight:800;font-size:13px}.integration-type{font-size:10px;color:var(--muted);margin-top:4px}
+.integration-desc{font-size:12px;color:var(--muted);line-height:1.7;min-height:42px}
+.integration-status{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #2a3852;padding-top:13px;font-size:11px}
+.state{display:inline-flex;align-items:center;gap:6px}.state-dot{width:7px;height:7px;border-radius:50%;background:#607189}.state.connected .state-dot{background:var(--green)}.state.error .state-dot{background:var(--red)}
+.mono{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;color:#b7c6e4}
+.codebox{background:#0b1322;border:1px solid #273650;border-radius:10px;padding:13px}
+.hidden{display:none!important}
+.toast-stack{position:fixed;right:20px;bottom:20px;z-index:30;display:grid;gap:8px}
+.toast{background:#1b2941;border:1px solid #455b81;color:#eef3ff;padding:12px 16px;border-radius:12px;max-width:350px;font-size:12px;box-shadow:0 12px 40px #0007}
+.toast.error{border-color:#854559}.footer-note{color:#5f7391;font-size:10px;margin-top:22px;line-height:1.7}
+#mobileNav{display:none}
+@media(max-width:1050px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}.quick-grid{grid-template-columns:1fr}.activity-card{min-height:250px}}
+@media(max-width:760px){.app{display:block}.sidebar{display:none}.topbar{height:68px;padding:0 16px}.top-sub,.status-chip{display:none}.content{padding:22px 14px 90px}.page-head{align-items:flex-start;flex-direction:column}.top-actions{margin-left:auto}#mobileNav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:#091120f5;border-top:1px solid #263550;padding:7px 5px calc(7px + env(safe-area-inset-bottom));justify-content:space-around;backdrop-filter:blur(18px)}#mobileNav .nav-btn{width:auto;flex-direction:column;gap:3px;padding:7px 8px;font-size:9px;min-width:52px}#mobileNav .nav-icon{font-size:17px}.nav-btn.active{box-shadow:inset 0 2px #97a5ff}.stats-grid{gap:9px}.stat-card{padding:14px}.stat-number{font-size:26px}.integration-grid{grid-template-columns:1fr}.keyword-row{grid-template-columns:minmax(0,1fr) 95px 36px}.keyword-row .keyword-switch{grid-column:1/-1;grid-row:2}.keyword-row .keyword-priority{grid-column:1/3;grid-row:3}.keyword-row .remove-keyword{grid-column:3;grid-row:1}.alert-card{grid-template-columns:1fr}.alert-actions{justify-content:flex-end}.setting-row{align-items:flex-start;flex-direction:column}.setting-control{width:100%}.setting-control select{flex:1}.form-row>*{width:100%}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">◎</div><div><div class="brand-title">Social Watch</div><div class="brand-sub">CONTROL CENTER</div></div></div>
+  <div><div class="nav-label">Workspace</div><nav id="sideNav">
+    <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span>Overview</button>
+    <button class="nav-btn" data-view="alerts"><span class="nav-icon">◈</span>Alert inbox<span class="nav-count" id="navUnread">0</span></button>
+    <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Keywords & rules</button>
+    <button class="nav-btn" data-view="automations"><span class="nav-icon">⤳</span>Automations</button>
+    <button class="nav-btn" data-view="integrations"><span class="nav-icon">▦</span>Integrations</button>
+  </nav></div>
+  <div><div class="nav-label">Manage</div><nav><button class="nav-btn" data-view="settings"><span class="nav-icon">⚙</span>Settings</button></nav></div>
+  <div class="side-bottom"><div><span class="pulse-dot"></span><strong id="sideDbStatus">Connecting…</strong></div><p>Alerts refresh automatically. Your credentials and integration secrets stay in Railway.</p></div>
+</aside>
+<div class="main">
+  <header class="topbar">
+    <div><div class="top-title" id="topTitle">Overview</div><div class="top-sub" id="topSub">Your monitoring, at a glance.</div></div>
+    <div class="top-actions"><span id="healthChip" class="status-chip"><span class="pulse-dot"></span>Checking status</span><button class="icon-btn" id="refreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button><form method="POST" action="/logout"><button class="btn ghost" type="submit">Log out</button></form></div>
+  </header>
+  <main class="content">
+    <section class="view active" id="view-overview">
+      <div class="page-head"><div><div class="eyebrow">Live monitoring</div><h1>Your watchtower.</h1><p class="lead">A live control center for alerts, keyword rules, and your Google Nest announcement flow.</p></div><button class="btn primary" id="overviewTest">＋ Create test alert</button></div>
+      <div class="grid stats-grid">
+        <article class="card stat-card"><div class="stat-top"><span>All-time alerts</span><span class="stat-icon">◈</span></div><div class="stat-number" id="statTotal">—</div><div class="stat-foot" id="statTotalFoot">Stored in PostgreSQL</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>Unread inbox</span><span class="stat-icon">✧</span></div><div class="stat-number" id="statUnread">—</div><div class="stat-foot">Waiting for your review</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>High priority · 24h</span><span class="stat-icon">↗</span></div><div class="stat-number" id="statHigh">—</div><div class="stat-foot">Urgent / critical signal</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>Connected services</span><span class="stat-icon">⌁</span></div><div class="stat-number" id="statServices">—</div><div class="stat-foot" id="statServicesFoot">Based on recent check-ins</div></article>
+      </div>
+      <div class="grid two-col">
+        <article class="card activity-card"><div class="card-head"><div><h2>Alert activity</h2><p>Daily volume over the last seven days</p></div><span class="priority normal">7 DAYS</span></div><div class="activity-bars" id="activityBars"><div class="empty">Loading activity…</div></div></article>
+        <article class="card"><div class="card-head"><div><h2>Service health</h2><p>Latest integrations and delivery paths</p></div><button class="text-link" data-go="integrations">View all ↗</button></div><div class="feed" id="servicePreview"><div class="empty">Checking services…</div></div></article>
+      </div>
+      <div class="grid two-col">
+        <article class="card"><div class="card-head"><div><h2>Latest alerts</h2><p>Most recent events across connected sources</p></div><button class="text-link" data-go="alerts">Open inbox ↗</button></div><div class="feed" id="latestFeed"><div class="empty">Loading alerts…</div></div></article>
+        <article class="card"><div class="card-head"><div><h2>Quick controls</h2><p>Jump into your most-used settings</p></div></div><div class="grid" style="gap:10px">
+          <div class="card quick-card" data-go="keywords"><div class="quick-icon">⌕</div><div><h3>Watch keywords</h3><p>Add, pause, or assign priority to monitored phrases.</p></div></div>
+          <div class="card quick-card" data-go="automations"><div class="quick-icon">♧</div><div><h3>Nest announcements</h3><p>Choose which alerts can speak and set quiet hours.</p></div></div>
+          <div class="card quick-card" data-go="integrations"><div class="quick-icon">⌘</div><div><h3>Connection status</h3><p>Check Discord bot and Home Assistant check-ins.</p></div></div>
+        </div></article>
+      </div>
+    </section>
+
+    <section class="view" id="view-alerts">
+      <div class="page-head"><div><div class="eyebrow">Event stream</div><h1>Alert inbox</h1><p class="lead">Search, filter, review, and clear alerts saved from your monitoring pipeline.</p></div><button class="btn primary" id="testAlertBtn">＋ Create test alert</button></div>
+      <div class="toolbar"><input class="control search" id="alertSearch" type="text" placeholder="Search messages, sources, keywords…"><select class="control" id="priorityFilter"><option value="">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="normal">Normal</option></select><select class="control" id="readFilter"><option value="">All statuses</option><option value="unread">Unread</option><option value="read">Read</option></select><button class="btn" id="markAllRead">Mark all read</button><button class="btn ghost" id="alertsRefresh">Refresh</button></div>
+      <div class="alert-list" id="alertsList"><div class="card empty">Loading alerts…</div></div>
+      <div class="footer-note" id="alertCount"></div>
+    </section>
+
+    <section class="view" id="view-keywords">
+      <div class="page-head"><div><div class="eyebrow">Detection rules</div><h1>Keywords & rules</h1><p class="lead">Edit what Social Watch listens for. The Discord bot pulls these rules from the dashboard automatically.</p></div><button class="btn primary" id="saveKeywordsTop">Save rules</button></div>
+      <article class="card"><div class="card-head"><div><h2>Watchlist</h2><p>Matching is case-insensitive and uses phrase containment.</p></div><span id="keywordCount" class="priority normal">0 RULES</span></div>
+        <div class="form-row" style="margin-bottom:16px"><input type="text" id="newKeyword" placeholder="Add phrase e.g. product launch"><select id="newKeywordPriority"><option value="normal">Normal priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select><button class="btn" id="addKeywordBtn">Add keyword</button></div>
+        <div id="keywordList" class="keyword-list"></div>
+        <p class="rule-foot">Changes take effect on the running bot at its next configuration check (about every 60 seconds). Avoid overly broad phrases such as “the” or “hi,” which can create noise.</p>
+      </article>
+    </section>
+
+    <section class="view" id="view-automations">
+      <div class="page-head"><div><div class="eyebrow">Alert delivery</div><h1>Automations</h1><p class="lead">Control where alerts go and which events are allowed to interrupt your space.</p></div><button class="btn primary" id="saveAutomationBtn">Save automation settings</button></div>
+      <article class="card"><div class="card-head"><div><h2>Delivery destinations</h2><p>Your Discord monitor and Home Assistant bridge use these preferences.</p></div></div><div class="setting-list">
+        <div class="setting-row"><div class="setting-copy"><strong>Post matched alerts in Discord</strong><p>Send detected keyword alerts to your configured Discord alert channel.</p></div><div class="setting-control"><input class="switch" type="checkbox" id="discordAlertsToggle" checked aria-label="Post matched alerts in Discord"></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Speak alerts on Google Nest Hub</strong><p>Allow the bot to pass eligible alerts through your Home Assistant webhook.</p></div><div class="setting-control"><input class="switch" type="checkbox" id="nestEnabledToggle" checked aria-label="Enable Google Nest announcements"></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Announcement priority</strong><p>Choose how much activity the Nest Hub should speak. Dashboard history is kept regardless.</p></div><div class="setting-control"><select id="nestMode"><option value="all">All matched alerts</option><option value="medium_high">Medium + high only</option><option value="high_only">High priority only</option><option value="off">Never announce</option></select></div></div>
+      </div></article>
+      <article class="card section-gap"><div class="card-head"><div><h2>Quiet hours</h2><p>Suppress Nest Hub announcements during a recurring time window.</p></div></div><div class="setting-list">
+        <div class="setting-row"><div class="setting-copy"><strong>Enable quiet hours</strong><p>The bot still records alerts and sends Discord notifications, but won't speak them during this window.</p></div><div class="setting-control"><input class="switch" type="checkbox" id="quietEnabledToggle" aria-label="Enable quiet hours"></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Quiet hours start</strong><p>Local time in the timezone selected below.</p></div><div class="setting-control"><input type="time" id="quietStart" value="22:00"></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Quiet hours end</strong><p>Announcements resume after this time.</p></div><div class="setting-control"><input type="time" id="quietEnd" value="07:00"></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Time zone</strong><p>Used for quiet-hours calculations on the bot.</p></div><div class="setting-control"><select id="timezone"><option value="America/New_York">Eastern — America/New_York</option><option value="America/Chicago">Central — America/Chicago</option><option value="America/Denver">Mountain — America/Denver</option><option value="America/Los_Angeles">Pacific — America/Los_Angeles</option><option value="UTC">UTC</option></select></div></div>
+      </div><div class="callout"><strong>Important:</strong> the bot must be online and the Home Assistant webhook variable configured for these delivery rules to take effect. Quiet hours do not pause alert collection.</div></article>
+    </section>
+
+    <section class="view" id="view-integrations">
+      <div class="page-head"><div><div class="eyebrow">Connections</div><h1>Integrations</h1><p class="lead">See which services have checked in recently and what's available to connect next.</p></div><button class="btn" id="refreshIntegrations">Refresh status</button></div>
+      <div class="grid integration-grid" id="integrationsGrid"><article class="card empty">Checking integrations…</article></div>
+      <article class="card section-gap"><div class="card-head"><div><h2>Incoming alert API</h2><p>Trusted services send alerts through this endpoint.</p></div></div><div class="codebox"><div class="mono" id="apiEndpoint">POST /api/alerts</div><p class="rule-foot">Requests require an Authorization: Bearer header using DASHBOARD_INGEST_KEY. Keep that key in Railway Variables; never put it in browser code or a public repository.</p></div></article>
+      <article class="card section-gap"><div class="card-head"><div><h2>Additional social sources</h2><p>Connector status is shown honestly; these need their own API access and worker before they can monitor anything.</p></div></div><div class="grid integration-grid">
+        <div class="integration-card"><div class="integration-top"><div class="integration-icon">◉</div><div><div class="integration-title">Reddit</div><div class="integration-type">Community monitoring</div></div></div><div class="integration-desc">Not connected yet. Requires an approved Reddit API integration and a worker that forwards matches to Social Watch.</div><div class="integration-status"><span class="state"><span class="state-dot"></span>Not connected</span><span class="priority normal">PLANNED</span></div></div>
+        <div class="integration-card"><div class="integration-top"><div class="integration-icon">▶</div><div><div class="integration-title">YouTube</div><div class="integration-type">Channel and video monitoring</div></div></div><div class="integration-desc">Not connected yet. Requires Google API configuration and a monitoring worker for the channels or search terms you choose.</div><div class="integration-status"><span class="state"><span class="state-dot"></span>Not connected</span><span class="priority normal">PLANNED</span></div></div>
+        <div class="integration-card"><div class="integration-top"><div class="integration-icon">𝕏</div><div><div class="integration-title">X</div><div class="integration-type">Public post monitoring</div></div></div><div class="integration-desc">Not connected yet. Requires eligible API access and a worker configured for your account's plan and permissions.</div><div class="integration-status"><span class="state"><span class="state-dot"></span>Not connected</span><span class="priority normal">PLANNED</span></div></div>
+        <div class="integration-card"><div class="integration-top"><div class="integration-icon">◎</div><div><div class="integration-title">Instagram / TikTok</div><div class="integration-type">Account and mention monitoring</div></div></div><div class="integration-desc">Not connected yet. Access depends on each platform's APIs, account type, permissions, and supported events.</div><div class="integration-status"><span class="state"><span class="state-dot"></span>Not connected</span><span class="priority normal">PLANNED</span></div></div>
+      </div></article>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="page-head"><div><div class="eyebrow">Preferences</div><h1>Settings</h1><p class="lead">Tune dashboard behavior without changing your private Railway credentials.</p></div><button class="btn primary" id="saveGeneralBtn">Save settings</button></div>
+      <article class="card"><div class="card-head"><div><h2>Dashboard preferences</h2><p>These settings apply to this dashboard experience.</p></div></div><div class="setting-list">
+        <div class="setting-row"><div class="setting-copy"><strong>Automatic refresh</strong><p>How often the dashboard checks for new alerts and service status.</p></div><div class="setting-control"><select id="refreshSeconds"><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="15">Every 15 seconds</option><option value="30">Every 30 seconds</option></select></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Browser notifications</strong><p>Show desktop notifications for newly received alerts while this dashboard is open. Browser permission is required.</p></div><div class="setting-control"><input class="switch" type="checkbox" id="browserNotifications" aria-label="Enable browser notifications"><button class="small-btn" id="requestBrowserPermission">Allow notifications</button></div></div>
+      </div></article>
+      <article class="card section-gap"><div class="card-head"><div><h2>Account & security</h2><p>Credentials are managed in Railway and are not stored in dashboard settings.</p></div></div><div class="setting-list">
+        <div class="setting-row"><div class="setting-copy"><strong>Dashboard sign-in</strong><p>Uses DASHBOARD_USERNAME and DASHBOARD_PASSWORD from the dashboard service's Railway Variables.</p></div><div class="setting-control"><span class="state connected"><span class="state-dot"></span>Protected</span></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Bot ingestion key</strong><p>Keep DASHBOARD_INGEST_KEY private and identical on the dashboard and bot services. Rotate it in both services if it is exposed.</p></div><div class="setting-control"><span class="state connected"><span class="state-dot"></span>Server-side only</span></div></div>
+        <div class="setting-row"><div class="setting-copy"><strong>Session signing secret</strong><p>SESSION_SECRET signs login cookies. Changing it signs out existing sessions.</p></div><div class="setting-control"><span class="state connected"><span class="state-dot"></span>Server-side only</span></div></div>
+      </div></article>
+      <p class="footer-note">Settings that affect the running Discord bot sync automatically through the authenticated bot configuration endpoint. Secrets are not returned to this page.</p>
+    </section>
+    <div class="footer-note">Social Watch · alerts stored in PostgreSQL · dashboard updates automatically</div>
+  </main>
+</div>
+<nav id="mobileNav">
+  <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span>Home</button>
+  <button class="nav-btn" data-view="alerts"><span class="nav-icon">◈</span>Alerts</button>
+  <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Rules</button>
+  <button class="nav-btn" data-view="automations"><span class="nav-icon">⤳</span>Automate</button>
+  <button class="nav-btn" data-view="integrations"><span class="nav-icon">▦</span>Links</button>
+  <button class="nav-btn" data-view="settings"><span class="nav-icon">⚙</span>Settings</button>
+</nav>
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+<script>
+const state={view:"overview",config:null,alerts:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false};
+const $=id=>document.getElementById(id);
+const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const titles={overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],settings:["Settings","Dashboard and account preferences."]};
+function toast(message,error=false){const node=document.createElement("div");node.className="toast"+(error?" error":"");node.textContent=message;$("toastStack").appendChild(node);setTimeout(()=>node.remove(),4300)}
+async function api(url,options={}){const response=await fetch(url,{cache:"no-store",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});if(response.status===401){location.href="/login";throw new Error("Your session expired.")}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||("Request failed: "+response.status));return data}
+function switchView(view){if(!titles[view])return;state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node.id==="view-"+view));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations()}
+document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
+document.querySelectorAll("[data-go]").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.go)));
+function priorityMarkup(value){const p=["high","medium","normal"].includes(value)?value:"normal";return '<span class="priority '+p+'">'+esc(p)+'</span>'}
+function timeAgo(value){if(!value)return"Never";const date=new Date(value);if(Number.isNaN(date.getTime()))return"Unknown";const seconds=Math.max(0,Math.round((Date.now()-date.getTime())/1000));if(seconds<60)return"Just now";if(seconds<3600)return Math.floor(seconds/60)+"m ago";if(seconds<86400)return Math.floor(seconds/3600)+"h ago";return date.toLocaleDateString()+" "+date.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
+function sourceIcon(key){return key==="discord_bot"?"◉":key==="home_assistant"?"⌂":"⌁"}
+function statusText(item){if(!item||!item.last_seen)return"Not seen yet";if(item.status==="error")return"Last check failed · "+timeAgo(item.last_seen);return (item.status==="connected"?"Connected":"Activity seen")+" · "+timeAgo(item.last_seen)}
+function statusClass(item){return item&&item.status==="connected"?"connected":item&&item.status==="error"?"error":""}
+async function loadSettings(){const data=await api("/api/settings");state.config=data.config;populateAutomationControls();populateGeneralControls();renderKeywords()}
+async function loadSummary(){const data=await api("/api/dashboard/summary");state.summary=data;$("statTotal").textContent=Number(data.total||0).toLocaleString();$("statUnread").textContent=Number(data.unread||0).toLocaleString();$("statHigh").textContent=Number(data.highPriority24h||0).toLocaleString();$("navUnread").textContent=Number(data.unread||0)>99?"99+":Number(data.unread||0);renderActivity(data.activity||[])}
+function renderActivity(days){const node=$("activityBars");const values=Array.isArray(days)?days:[];const max=Math.max(1,...values.map(x=>Number(x.count||0)));node.innerHTML=values.map(d=>'<div class="day-col"><div class="day-value">'+esc(d.count)+'</div><div class="bar-area"><div class="bar" style="height:'+Math.max(4,Math.round(Number(d.count||0)/max*100))+'%"></div></div><div class="day-label">'+esc(d.label)+'</div></div>').join("")||'<div class="empty">No activity yet.</div>'}
+async function loadAlerts(notify=false){const params=new URLSearchParams({limit:"100"});if(state.view==="alerts"){if($("alertSearch").value.trim())params.set("search",$("alertSearch").value.trim());if($("priorityFilter").value)params.set("priority",$("priorityFilter").value);if($("readFilter").value)params.set("status",$("readFilter").value)}const data=await api("/api/alerts?"+params.toString());const incoming=data.alerts||[];if(notify&&!state.firstLoad&&state.config?.preferences?.browserNotificationsEnabled&&"Notification"in window&&Notification.permission==="granted"){const fresh=incoming.filter(a=>!state.knownIds.has(String(a.id))&&!a.is_read);fresh.slice(0,3).forEach(a=>new Notification("Social Watch · "+String(a.priority||"normal").toUpperCase(),{body:String(a.message||"New alert").slice(0,180)}))}state.knownIds=new Set(incoming.map(a=>String(a.id)));state.alerts=incoming;if(state.view==="alerts")renderAlerts(data.total);renderFeed();state.firstLoad=false}
+function renderAlertCard(a){const message=String(a.message||"");return '<article class="card alert-card '+(a.is_read?"":"unread")+'"><div><div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:7px"><h3>'+esc(a.source||"Unknown source")+'</h3>'+priorityMarkup(a.priority)+' '+(a.is_read?"":'<span class="state"><span class="state-dot" style="background:#98a4ff"></span>Unread</span>')+'</div><div class="alert-message">'+esc(message)+'</div><div class="alert-card-foot"><span>'+esc(a.keyword||"No keyword")+'</span><span>·</span><span>'+esc(new Date(a.created_at).toLocaleString())+'</span><span>·</span><span>Alert #'+esc(a.id)+'</span></div></div><div class="alert-actions">'+(a.is_read?'':'<button class="small-btn" data-mark-read="'+esc(a.id)+'">Mark read</button>')+'<button class="small-btn danger" data-delete-alert="'+esc(a.id)+'">Delete</button></div></article>'}
+function renderAlerts(total){const node=$("alertsList");node.innerHTML=state.alerts.length?state.alerts.map(renderAlertCard).join(""):'<div class="card empty">No alerts match these filters. Try another search or wait for a new event.</div>';$("alertCount").textContent=(total??state.alerts.length)+" matching alerts · showing up to 100";node.querySelectorAll("[data-mark-read]").forEach(b=>b.addEventListener("click",()=>markRead(b.dataset.markRead)));node.querySelectorAll("[data-delete-alert]").forEach(b=>b.addEventListener("click",()=>deleteAlert(b.dataset.deleteAlert)))}
+function feedRow(a){return '<div class="feed-row"><span class="feed-dot" style="'+(a.priority==="high"?"background:var(--red)":a.priority==="medium"?"background:var(--amber)":"")+'"></span><div><div class="feed-title">'+(!a.is_read?'<span class="unread-mark"></span>':"")+esc(a.source||"Unknown source")+' — '+esc(String(a.message||"").split("\n")[0].slice(0,100))+'</div><div class="feed-meta">'+esc(a.keyword||"")+' · '+esc(timeAgo(a.created_at))+'</div></div>'+priorityMarkup(a.priority)+'</div>'}
+function renderFeed(){const latest=state.alerts.slice(0,5);$("latestFeed").innerHTML=latest.length?latest.map(feedRow).join(""):'<div class="empty">Your latest events will appear here when the bot detects a matching keyword.</div>'}
+async function refreshAll(notify=false){try{const results=await Promise.allSettled([loadSummary(),loadAlerts(notify),loadIntegrations()]);const failed=results.some(r=>r.status==="rejected");$("healthChip").innerHTML='<span class="pulse-dot" style="background:'+(failed?"var(--amber)":"var(--green)")+'"></span>'+(failed?"Some checks failed":"Dashboard online");$("sideDbStatus").textContent=failed?"Check connection":"Database + API online";if(failed)toast("One or more dashboard checks failed. Check the page and retry.",true)}catch(e){toast(e.message,true)}}
+async function loadIntegrations(){const data=await api("/api/integrations");state.integrations=data.integrations||[];const online=state.integrations.filter(x=>x.status==="connected").length;$("statServices").textContent=online;$("statServicesFoot").textContent=state.integrations.length+" tracked services";renderIntegrations();renderServicePreview()}
+function renderServicePreview(){const items=state.integrations.slice(0,3);$("servicePreview").innerHTML=items.map(item=>'<div class="feed-row"><span class="feed-dot" style="background:'+(item.status==="connected"?"var(--green)":item.status==="error"?"var(--red)":"#607189")+'"></span><div><div class="feed-title">'+esc(item.name)+'</div><div class="feed-meta">'+esc(statusText(item))+'</div></div><span style="font-size:10px;color:var(--muted)">'+(item.status==="connected"?"Online":item.status==="error"?"Error":"Idle")+'</span></div>').join("")||'<div class="empty">No integration data yet.</div>'}
+function renderIntegrations(){const node=$("integrationsGrid");if(!node)return;const items=state.integrations;const descriptions={dashboard:{desc:"Dashboard and PostgreSQL receive and store alerts for the inbox, rules, and activity view.",icon:"◈"},discord_bot:{desc:"Your Discord monitoring bot detects configured keywords and sends alerts to this dashboard.",icon:"◉"},home_assistant:{desc:"The bot sends eligible announcements to your Home Assistant webhook, which calls Google Assistant SDK.",icon:"⌂"}};const core=items.map(item=>{const meta=descriptions[item.key]||{desc:item.description||"Service status is tracked from authenticated check-ins.",icon:sourceIcon(item.key)};return '<article class="card integration-card"><div class="integration-top"><div class="integration-icon">'+meta.icon+'</div><div><div class="integration-title">'+esc(item.name)+'</div><div class="integration-type">'+esc(item.type||"Integration")+'</div></div></div><div class="integration-desc">'+esc(meta.desc)+'</div><div class="integration-status"><span class="state '+statusClass(item)+'"><span class="state-dot"></span>'+esc(item.status==="connected"?"Connected":item.status==="error"?"Needs attention":"Not confirmed")+'</span><span class="feed-meta">'+esc(statusText(item))+'</span></div></article>'}).join("");node.innerHTML=core||'<article class="card empty">No integration data yet.</article>'}
+function populateAutomationControls(){if(!state.config)return;const a=state.config.automations;$("discordAlertsToggle").checked=!!a.discordChannelAlertsEnabled;$("nestEnabledToggle").checked=!!a.homeAssistantAnnouncementsEnabled;$("nestMode").value=a.nestAnnouncementMode||"all";$("quietEnabledToggle").checked=!!a.quietHoursEnabled;$("quietStart").value=a.quietHoursStart||"22:00";$("quietEnd").value=a.quietHoursEnd||"07:00";$("timezone").value=a.timezone||"America/New_York"}
+function populateGeneralControls(){if(!state.config)return;$("refreshSeconds").value=String(state.config.preferences?.refreshSeconds||5);$("browserNotifications").checked=!!state.config.preferences?.browserNotificationsEnabled}
+function renderKeywords(){if(!state.config)return;const node=$("keywordList");const rules=state.config.keywords||[];$("keywordCount").textContent=rules.length+" RULES";node.innerHTML=rules.length?rules.map((r,i)=>'<div class="keyword-row" data-keyword-row="'+i+'"><div class="keyword-term"><span style="color:var(--muted);font-size:10px;min-width:18px">'+String(i+1).padStart(2,"0")+'</span><input type="text" aria-label="Keyword phrase" data-keyword-term="'+i+'" value="'+esc(r.term)+'" maxlength="80"></div><div class="keyword-priority"><select data-keyword-priority="'+i+'" aria-label="Keyword priority"><option value="normal" '+(r.priority==="normal"?"selected":"")+'>Normal</option><option value="medium" '+(r.priority==="medium"?"selected":"")+'>Medium</option><option value="high" '+(r.priority==="high"?"selected":"")+'>High</option></select></div><label class="keyword-switch"><input class="switch" type="checkbox" data-keyword-enabled="'+i+'" '+(r.enabled?"checked":"")+'> Enabled</label><button class="small-btn danger remove-keyword" data-remove-keyword="'+i+'" title="Remove keyword" aria-label="Remove keyword">×</button></div>').join(""):'<div class="empty">No keywords configured. Add a phrase above to start monitoring.</div>';node.querySelectorAll("[data-remove-keyword]").forEach(b=>b.addEventListener("click",()=>{state.config.keywords.splice(Number(b.dataset.removeKeyword),1);renderKeywords()}))}
+function captureKeywordEdits(){if(!state.config)return;document.querySelectorAll("[data-keyword-row]").forEach(row=>{const i=Number(row.dataset.keywordRow);if(!state.config.keywords[i])return;state.config.keywords[i].term=row.querySelector("[data-keyword-term]").value.trim();state.config.keywords[i].priority=row.querySelector("[data-keyword-priority]").value;state.config.keywords[i].enabled=row.querySelector("[data-keyword-enabled]").checked})}
+async function saveConfig(successMessage){try{captureKeywordEdits();const data=await api("/api/settings",{method:"PUT",body:JSON.stringify({config:state.config})});state.config=data.config;populateAutomationControls();populateGeneralControls();renderKeywords();toast(successMessage||"Settings saved. The bot will sync shortly.");await refreshAll(false);resetAutoRefresh()}catch(e){toast(e.message,true)}}
+$("addKeywordBtn").addEventListener("click",()=>{captureKeywordEdits();const term=$("newKeyword").value.trim().toLowerCase();if(!term)return toast("Enter a keyword phrase first.",true);if(term.length>80)return toast("Keep keyword phrases to 80 characters or fewer.",true);if(state.config.keywords.some(r=>r.term.toLowerCase()===term))return toast("That keyword already exists.",true);state.config.keywords.push({id:cryptoRandomId(),term,priority:$("newKeywordPriority").value,enabled:true});$("newKeyword").value="";renderKeywords()});
+$("newKeyword").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("addKeywordBtn").click()}});
+function cryptoRandomId(){return"rule-"+Math.random().toString(36).slice(2,10)}
+$("saveKeywordsTop").addEventListener("click",()=>saveConfig("Keyword rules saved. The bot will sync in about 60 seconds."));
+function captureAutomationControls(){const a=state.config.automations;a.discordChannelAlertsEnabled=$("discordAlertsToggle").checked;a.homeAssistantAnnouncementsEnabled=$("nestEnabledToggle").checked;a.nestAnnouncementMode=$("nestMode").value;a.quietHoursEnabled=$("quietEnabledToggle").checked;a.quietHoursStart=$("quietStart").value||"22:00";a.quietHoursEnd=$("quietEnd").value||"07:00";a.timezone=$("timezone").value}
+$("saveAutomationBtn").addEventListener("click",()=>{captureAutomationControls();saveConfig("Automation preferences saved.")});
+$("saveGeneralBtn").addEventListener("click",()=>{state.config.preferences.refreshSeconds=Number($("refreshSeconds").value);state.config.preferences.browserNotificationsEnabled=$("browserNotifications").checked;saveConfig("Dashboard settings saved.")});
+$("requestBrowserPermission").addEventListener("click",async()=>{if(!("Notification"in window))return toast("This browser doesn't support desktop notifications.",true);const permission=await Notification.requestPermission();if(permission==="granted"){$("browserNotifications").checked=true;state.config.preferences.browserNotificationsEnabled=true;await saveConfig("Browser notifications enabled.")}else toast("Browser notification permission was not granted.",true)});
+async function markRead(id){try{await api("/api/alerts/"+encodeURIComponent(id)+"/read",{method:"PATCH",body:"{}"});await refreshAll(false);toast("Alert marked read.")}catch(e){toast(e.message,true)}}
+async function deleteAlert(id){if(!confirm("Delete this alert permanently?"))return;try{await api("/api/alerts/"+encodeURIComponent(id),{method:"DELETE"});await refreshAll(false);toast("Alert deleted.")}catch(e){toast(e.message,true)}}
+async function testAlert(){try{await api("/api/alerts/test",{method:"POST",body:JSON.stringify({})});await refreshAll(false);toast("Test alert saved. This tests dashboard storage, not Google Nest delivery.")}catch(e){toast(e.message,true)}}
+$("overviewTest").addEventListener("click",testAlert);$("testAlertBtn").addEventListener("click",testAlert);
+$("markAllRead").addEventListener("click",async()=>{try{await api("/api/alerts/bulk-read",{method:"POST",body:"{}"});await refreshAll(false);toast("All alerts marked read.")}catch(e){toast(e.message,true)}});
+$("refreshBtn").addEventListener("click",()=>refreshAll(false));$("alertsRefresh").addEventListener("click",()=>refreshAll(false));$("refreshIntegrations").addEventListener("click",()=>loadIntegrations().then(()=>toast("Integration status refreshed.")).catch(e=>toast(e.message,true)));
+let searchTimer;["alertSearch","priorityFilter","readFilter"].forEach(id=>$(id).addEventListener(id==="alertSearch"?"input":"change",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadAlerts(false).catch(e=>toast(e.message,true)),180)}));
+function resetAutoRefresh(){if(state.refreshTimer)clearInterval(state.refreshTimer);const seconds=Number(state.config?.preferences?.refreshSeconds||5);state.refreshTimer=setInterval(()=>refreshAll(true),Math.max(5,seconds)*1000)}
+async function boot(){try{await loadSettings();await refreshAll(false);resetAutoRefresh()}catch(e){toast(e.message,true);$("healthChip").textContent="Connection problem";$("sideDbStatus").textContent="Connection problem"}}
+boot();
+</script>
+</body>
+</html>
