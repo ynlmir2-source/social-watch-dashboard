@@ -708,17 +708,7 @@ app.delete("/api/alerts/:id", requireLogin, requireSameOrigin, async (req, res) 
   }
 });
 
-app.post("/api/alerts/bulk-read", requireLogin, requireSameOrigin, async (req, res) => {
-  try {
-    const result = await pool.query(
-      "UPDATE social_watch_alerts SET is_read = TRUE WHERE is_read = FALSE"
-    );
-    res.json({ success: true, updated: result.rowCount });
-  } catch (error) {
-    console.error("Bulk mark read failed:", error.message);
-    res.status(500).json({ error: "Unable to update alerts." });
-  }
-});
+
 
 app.post("/api/alerts/test", requireLogin, requireSameOrigin, async (req, res) => {
   try {
