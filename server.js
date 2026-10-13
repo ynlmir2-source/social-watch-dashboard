@@ -39,14 +39,19 @@ const pool = new Pool({
 });
 
 const DEFAULT_TERMS = [
-  { term: "social watch", priority: "medium", enabled: true },
-  { term: "project update", priority: "normal", enabled: true },
-  { term: "event announcement", priority: "medium", enabled: true },
-  { term: "urgent", priority: "high", enabled: true },
-  { term: "launch", priority: "normal", enabled: true },
-  { term: "settings", priority: "normal", enabled: true },
-  { term: "owner info", priority: "normal", enabled: true },
+  { term: "social watch", priority: "medium", action: "record_only", enabled: true },
+  { term: "project update", priority: "normal", action: "discord", enabled: true },
+  { term: "event announcement", priority: "medium", action: "nest", enabled: true },
+  { term: "urgent", priority: "high", action: "discord_nest", enabled: true },
+  { term: "launch", priority: "normal", action: "discord_nest", enabled: true },
+  { term: "settings", priority: "normal", action: "record_only", enabled: true },
+  { term: "owner info", priority: "normal", action: "discord", enabled: true },
 ];
+
+function defaultKeywordAction(term) {
+  const defaults = DEFAULT_TERMS.find((rule) => rule.term === String(term || "").toLowerCase());
+  return defaults?.action || "discord_nest";
+}
 
 function buildDefaultConfig() {
   const envWords = (process.env.WATCH_KEYWORDS || "")
@@ -63,6 +68,7 @@ function buildDefaultConfig() {
           : /\b(announcement|important|warning)\b/.test(term)
             ? "medium"
             : "normal",
+        action: defaultKeywordAction(term),
         enabled: true,
       }))
     : DEFAULT_TERMS.map((rule) => ({
@@ -227,6 +233,9 @@ function normalizeConfig(input, previous) {
     const matchMode = ["contains", "whole_word"].includes(rule.matchMode)
       ? rule.matchMode
       : "contains";
+    const action = ["record_only", "discord", "nest", "discord_nest"].includes(rule.action)
+      ? rule.action
+      : defaultKeywordAction(term);
     const exclude = Array.isArray(rule.exclude)
       ? rule.exclude.map((item) => String(item).trim().toLowerCase().slice(0, 80)).filter(Boolean).slice(0, 20)
       : typeof rule.exclude === "string"
@@ -239,6 +248,7 @@ function normalizeConfig(input, previous) {
         : crypto.randomUUID(),
       term,
       priority,
+      action,
       enabled: rule.enabled !== false,
       matchMode,
       exclude: [...new Set(exclude)],
@@ -585,7 +595,7 @@ app.get("/api/bot-config", requireIngestKey, async (req, res) => {
     res.json({
       keywords: (row.config.keywords || [])
         .filter((rule) => rule.enabled)
-        .map(({ term, priority }) => ({ term, priority })),
+        .map(({ term, priority, action, matchMode, exclude }) => ({ term, priority, action, matchMode, exclude })),
       automations: row.config.automations,
       updatedAt: row.updated_at,
     });
