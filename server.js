@@ -10,6 +10,17 @@ const SESSION_COOKIE = "social_watch_session";
 const SESSION_DURATION = 12 * 60 * 60 * 1000;
 
 app.disable("x-powered-by");
+
+// Baseline browser security headers. Avoid a CSP here because the current UI
+// includes inline assets; CSP can be tightened separately after those are moved.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 
