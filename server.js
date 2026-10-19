@@ -6,6 +6,7 @@ const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const STUDIO_RELAY_TOKEN = process.env.STUDIO_RELAY_TOKEN || "";
 const SESSION_COOKIE = "social_watch_session";
 const SESSION_DURATION = 12 * 60 * 60 * 1000;
 
@@ -186,6 +187,18 @@ function requireIngestKey(req, res, next) {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match || !safeEqual(match[1], process.env.DASHBOARD_INGEST_KEY)) {
     return res.status(401).json({ error: "Invalid ingestion credentials." });
+  }
+  next();
+}
+
+function requireStudioRelayToken(req, res, next) {
+  const authorization = req.get("authorization") || "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  if (!STUDIO_RELAY_TOKEN) {
+    return res.status(503).json({ error: "Studio relay is not configured." });
+  }
+  if (!match || !safeEqual(match[1], STUDIO_RELAY_TOKEN)) {
+    return res.status(401).json({ error: "Invalid Studio relay credentials." });
   }
   next();
 }
@@ -421,6 +434,38 @@ async function initializeDatabase() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS social_watch_logs_level_created_idx
     ON social_watch_logs (level, created_at DESC)
+  `);
+
+  await pool.query(`
+    ALTER TABLE social_watch_logs
+    ADD COLUMN IF NOT EXISTS discord_forwarded_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_studio_logs_pending_idx
+    ON social_watch_logs (id)
+    WHERE source LIKE 'roblox-studio%' AND discord_forwarded_at IS NULL
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS studio_commands (
+      id TEXT PRIMARY KEY,
+      operation TEXT NOT NULL CHECK (operation IN ('status', 'place_test_marker', 'clear_test_markers')),
+      requested_by TEXT NOT NULL DEFAULT 'unknown',
+      requested_by_id TEXT NOT NULL DEFAULT '',
+      guild_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+      relay_id TEXT,
+      result TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      claimed_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS studio_commands_queue_idx
+    ON studio_commands (status, created_at ASC)
   `);
 
   const defaults = buildDefaultConfig();
@@ -771,6 +816,233 @@ app.get("/api/integrations", requireLogin, async (req, res) => {
   } catch (error) {
     console.error("Integration status failed:", error.message);
     res.status(500).json({ error: "Unable to load integrations." });
+  }
+});
+
+
+app.post("/api/studio/commands", requireIngestKey, async (req, res) => {
+  try {
+    const operation = String(req.body?.operation || "").trim();
+    const allowedOperations = new Set(["status", "place_test_marker", "clear_test_markers"]);
+    if (!allowedOperations.has(operation)) {
+      return res.status(400).json({ error: "Unsupported Studio operation." });
+    }
+
+    const requestedBy = String(req.body?.requestedBy || "Discord admin").trim().slice(0, 100) || "Discord admin";
+    const requestedById = String(req.body?.requestedById || "").trim().slice(0, 32);
+    const guildId = String(req.body?.guildId || "").trim().slice(0, 32);
+    const id = crypto.randomUUID();
+    const result = await pool.query(
+      `INSERT INTO studio_commands (id, operation, requested_by, requested_by_id, guild_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, operation, requested_by, status, created_at`,
+      [id, operation, requestedBy, requestedById, guildId]
+    );
+    await pool.query(
+      `INSERT INTO social_watch_logs (level, source, message, details)
+       VALUES ('info', 'roblox-studio-command', $1, $2::jsonb)`,
+      [
+        "Discord queued Studio operation: " + operation + " · by " + requestedBy + " (" + requestedById + ")",
+        JSON.stringify({ commandId: id, operation, guildId, requestedById }),
+      ]
+    );
+    res.status(201).json({ success: true, command: result.rows[0] });
+  } catch (error) {
+    console.error("Failed to queue Studio operation:", error.message);
+    res.status(500).json({ error: "Unable to queue Studio operation." });
+  }
+});
+
+app.get("/api/studio/relay/status", requireIngestKey, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT status, last_seen, details
+       FROM social_watch_integrations
+       WHERE service_key = 'roblox_studio_relay'`
+    );
+    const row = result.rows[0] || null;
+    const online = !!row && row.status === "connected" &&
+      Date.now() - new Date(row.last_seen).getTime() < 60000;
+    res.json({
+      online,
+      status: online ? "connected" : "offline",
+      lastSeen: row?.last_seen || null,
+      details: row?.details || {},
+    });
+  } catch (error) {
+    console.error("Studio relay status failed:", error.message);
+    res.status(500).json({ error: "Unable to read Studio relay status." });
+  }
+});
+
+app.get("/api/studio/logs/pending", requireIngestKey, async (req, res) => {
+  try {
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+    const result = await pool.query(
+      `SELECT id, level, source, message, details, created_at
+       FROM social_watch_logs
+       WHERE source LIKE 'roblox-studio%' AND discord_forwarded_at IS NULL
+       ORDER BY id ASC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({ logs: result.rows });
+  } catch (error) {
+    console.error("Pending Studio log lookup failed:", error.message);
+    res.status(500).json({ error: "Unable to load pending Studio logs." });
+  }
+});
+
+app.post("/api/studio/logs/ack", requireIngestKey, async (req, res) => {
+  try {
+    const input = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const ids = [...new Set(input.map((id) => String(id)).filter((id) => /^\d{1,18}$/.test(id)))].slice(0, 50);
+    if (!ids.length) return res.status(400).json({ error: "At least one valid log ID is required." });
+    const result = await pool.query(
+      `UPDATE social_watch_logs
+       SET discord_forwarded_at = NOW()
+       WHERE id = ANY($1::bigint[]) AND source LIKE 'roblox-studio%' AND discord_forwarded_at IS NULL
+       RETURNING id`,
+      [ids]
+    );
+    res.json({ success: true, acknowledged: result.rows.length });
+  } catch (error) {
+    console.error("Studio log acknowledgement failed:", error.message);
+    res.status(500).json({ error: "Unable to acknowledge Studio logs." });
+  }
+});
+
+app.post("/api/studio/relay/heartbeat", requireStudioRelayToken, async (req, res) => {
+  try {
+    const relayId = String(req.body?.relayId || "studio-plugin").trim().slice(0, 80) || "studio-plugin";
+    const details = req.body?.details && typeof req.body.details === "object" && !Array.isArray(req.body.details)
+      ? req.body.details
+      : {};
+    const detailsText = JSON.stringify(details);
+    if (Buffer.byteLength(detailsText, "utf8") > 4000) {
+      return res.status(400).json({ error: "Relay details are too large." });
+    }
+    await pool.query(
+      `INSERT INTO social_watch_integrations (service_key, display_name, status, last_seen, details)
+       VALUES ('roblox_studio_relay', 'Roblox Studio relay', 'connected', NOW(), $1::jsonb)
+       ON CONFLICT (service_key) DO UPDATE
+       SET status = 'connected', last_seen = NOW(), details = EXCLUDED.details`,
+      [JSON.stringify({ relayId, ...details })]
+    );
+    res.json({ success: true, lastSeen: new Date().toISOString() });
+  } catch (error) {
+    console.error("Studio relay heartbeat failed:", error.message);
+    res.status(500).json({ error: "Unable to record Studio relay heartbeat." });
+  }
+});
+
+app.get("/api/studio/relay/commands/next", requireStudioRelayToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE studio_commands
+       SET status = 'queued', relay_id = NULL, claimed_at = NULL
+       WHERE status = 'running' AND claimed_at < NOW() - INTERVAL '3 minutes'`
+    );
+    const pending = await client.query(
+      `SELECT id, operation, requested_by, requested_by_id, guild_id, created_at
+       FROM studio_commands
+       WHERE status = 'queued'
+       ORDER BY created_at ASC
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED`
+    );
+    if (!pending.rows.length) {
+      await client.query("COMMIT");
+      return res.json({ command: null });
+    }
+    const claimed = await client.query(
+      `UPDATE studio_commands
+       SET status = 'running', relay_id = $2, claimed_at = NOW()
+       WHERE id = $1
+       RETURNING id, operation, requested_by, requested_by_id, guild_id, status, created_at`,
+      [pending.rows[0].id, String(req.body?.relayId || "studio-plugin").slice(0, 80)]
+    );
+    await client.query("COMMIT");
+    res.json({ command: claimed.rows[0] });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("Studio command claim failed:", error.message);
+    res.status(500).json({ error: "Unable to claim a Studio command." });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/studio/relay/commands/:commandId/result", requireStudioRelayToken, async (req, res) => {
+  try {
+    const commandId = String(req.params.commandId || "");
+    if (!/^[0-9a-f-]{36}$/i.test(commandId)) {
+      return res.status(400).json({ error: "Invalid command ID." });
+    }
+    const status = String(req.body?.status || "").toLowerCase();
+    const resultText = typeof req.body?.result === "string" ? req.body.result.trim().slice(0, 1800) : "";
+    if (!["succeeded", "failed"].includes(status) || !resultText) {
+      return res.status(400).json({ error: "A succeeded/failed status and result are required." });
+    }
+    const updated = await pool.query(
+      `UPDATE studio_commands
+       SET status = $2, result = $3, completed_at = NOW()
+       WHERE id = $1 AND status = 'running'
+       RETURNING id, operation, requested_by, requested_by_id, guild_id, status, result, completed_at`,
+      [commandId, status, resultText]
+    );
+    if (!updated.rows.length) {
+      return res.status(409).json({ error: "Command is missing or no longer running." });
+    }
+    const command = updated.rows[0];
+    await pool.query(
+      `INSERT INTO social_watch_logs (level, source, message, details)
+       VALUES ($1, 'roblox-studio-command', $2, $3::jsonb)`,
+      [
+        status === "failed" ? "error" : "info",
+        "Studio command " + command.operation + " " + status + ": " + resultText,
+        JSON.stringify({ commandId, operation: command.operation, requestedById: command.requested_by_id }),
+      ]
+    );
+    res.json({ success: true, command });
+  } catch (error) {
+    console.error("Studio command result failed:", error.message);
+    res.status(500).json({ error: "Unable to save Studio command result." });
+  }
+});
+
+app.post("/api/studio/relay/logs", requireStudioRelayToken, async (req, res) => {
+  try {
+    const level = String(req.body?.level || "info").toLowerCase();
+    let message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!["debug", "info", "warning", "error", "critical"].includes(level)) {
+      return res.status(400).json({ error: "Invalid Studio log level." });
+    }
+    if (!message || message.length > 4000) {
+      return res.status(400).json({ error: "Studio log message is required and must be at most 4000 characters." });
+    }
+    message = message
+      .replace(/(?:mfa\.[A-Za-z0-9_-]{20,}|[A-Za-z0-9_-]{23,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{20,})/g, "[REDACTED_TOKEN]")
+      .replace(/(Bearer\s+)[^\s'"]+/gi, "$1[REDACTED]");
+    const details = req.body?.details && typeof req.body.details === "object" && !Array.isArray(req.body.details)
+      ? req.body.details
+      : {};
+    const detailsText = JSON.stringify(details);
+    if (Buffer.byteLength(detailsText, "utf8") > 4000) {
+      return res.status(400).json({ error: "Studio log details are too large." });
+    }
+    const result = await pool.query(
+      `INSERT INTO social_watch_logs (level, source, message, details)
+       VALUES ($1, 'roblox-studio', $2, $3::jsonb)
+       RETURNING id, level, source, message, details, created_at`,
+      [level, message, detailsText]
+    );
+    res.status(201).json({ success: true, log: result.rows[0] });
+  } catch (error) {
+    console.error("Failed to save Roblox Studio log:", error.message);
+    res.status(500).json({ error: "Unable to save Studio log." });
   }
 });
 
