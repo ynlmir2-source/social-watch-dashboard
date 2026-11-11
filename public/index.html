@@ -230,6 +230,40 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 .ai-compose textarea{width:100%;resize:vertical;min-height:76px}
 .ai-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px}
 @media(max-width:600px){.ai-compose{grid-template-columns:1fr}.ai-compose button{width:100%}.ai-message{max-width:96%}}
+
+.ai-page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.ai-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ai-workspace{width:100%;max-width:930px;margin:0 auto;display:flex;flex-direction:column;min-height:min(70vh,780px)}
+.ai-messages{display:flex;flex-direction:column;gap:20px;min-height:360px;flex:1;overflow:auto;padding:24px 12px 18px;scroll-behavior:smooth}
+.ai-message{max-width:88%;font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-message.user{align-self:flex-end;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:12px 16px}
+.ai-message.assistant{align-self:stretch;max-width:100%;padding:4px 2px;color:var(--text)}
+.ai-message .ai-role{display:block;font-size:10px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.ai-message pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111;padding:12px;border-radius:10px;border:1px solid var(--line)}
+.ai-composer{border:1px solid #444;border-radius:23px;background:var(--panel);padding:12px 14px 10px;box-shadow:0 10px 34px #0002}
+.ai-composer textarea{width:100%;border:0;background:transparent;box-shadow:none!important;resize:none;min-height:58px;max-height:180px;padding:8px 6px;font-size:15px!important;line-height:1.5}
+.ai-composer textarea:focus{border:0}
+.ai-composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ai-tools{display:flex;align-items:center;gap:10px;min-width:0}
+.ai-tool{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:99px;padding:8px 12px;font-size:12px}
+.ai-upload-hint{font-size:10px;color:var(--muted)}
+.ai-attachment-tray{display:flex;gap:8px;flex-wrap:wrap;padding:4px 10px 12px}
+.ai-attachment{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:7px 9px;font-size:11px;max-width:100%}
+.ai-attachment img{width:38px;height:38px;object-fit:cover;border-radius:7px}
+.ai-attachment button{border:0;background:transparent;color:var(--muted);font-size:16px;min-height:24px}
+.ai-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px;padding:12px 8px}
+.ai-settings-panel{max-width:930px;margin:18px auto 0}
+.ai-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.ai-setting{display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:700}
+.ai-setting small{font-size:10px;line-height:1.5;color:var(--muted);font-weight:400}
+.ai-setting output{float:right;color:var(--accent2);font-weight:700}
+.ai-setting input[type=range]{width:100%}
+.ai-setting-toggle{flex-direction:row;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:12px}
+.ai-setting-toggle span{display:flex;flex-direction:column;gap:5px}
+.ai-setting-toggle small{max-width:340px}
+.ai-settings-actions{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
+.ai-disclaimer{max-width:930px;margin:14px auto 0;color:var(--muted);font-size:10px;line-height:1.6;text-align:center}
+@media(max-width:760px){.ai-page-head{align-items:flex-start;flex-direction:column}.ai-head-actions{width:100%}.ai-head-actions .status-chip{display:inline-flex}.ai-workspace{min-height:65vh}.ai-messages{min-height:300px;padding:14px 3px}.ai-message{max-width:94%;font-size:14px}.ai-settings-grid{grid-template-columns:1fr}.ai-upload-hint{display:none}.ai-composer{padding:9px 10px}.ai-composer textarea{font-size:16px!important}}
 </style>
 </head>
 <body>
@@ -279,14 +313,31 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 
 
     <section class="view" id="view-ai">
-      <div class="page-head"><div><div class="eyebrow">Local intelligence</div><h1>Spectrum AI</h1><p class="lead">Your private assistant, powered by the Qwen 2.5 7B model running on your computer.</p></div><span class="status-chip" id="aiStatus"><span class="pulse-dot" style="background:var(--amber)"></span>Checking local model</span></div>
-      <article class="card ai-shell">
-        <div class="card-head"><div><h2>Private AI conversation</h2><p>Conversation history is stored in your Social Watch PostgreSQL database.</p></div><span class="priority normal">QWEN 2.5 · 7B</span></div>
+      <div class="ai-page-head"><div><div class="eyebrow">Private local assistant</div><h1>Spectrum</h1><p class="lead">A fast, private workspace for questions, files, images, and ideas.</p></div><div class="ai-head-actions"><span class="status-chip" id="aiStatus"><span class="pulse-dot" style="background:var(--amber)"></span>Checking model</span><button class="btn" id="aiNewChat" type="button">＋ New chat</button><button class="btn" id="aiSettingsToggle" type="button">⚙ Settings</button></div></div>
+      <div class="ai-workspace">
         <div class="ai-messages" id="aiMessages" aria-live="polite"><div class="empty">Loading your conversation…</div></div>
-        <div class="ai-compose"><textarea id="aiInput" rows="3" maxlength="8000" placeholder="Ask Spectrum anything…" aria-label="Message Spectrum AI"></textarea><button class="btn primary" id="aiSend" type="button">Send ↗</button></div>
-        <div class="ai-foot"><span>Local model · authenticated private gateway</span><span id="aiModelLabel">Model status pending</span></div>
+        <div class="ai-attachment-tray hidden" id="aiAttachmentTray" aria-label="Attachments"></div>
+        <div class="ai-composer">
+          <textarea id="aiInput" rows="2" maxlength="8000" placeholder="Message Spectrum…" aria-label="Message Spectrum AI"></textarea>
+          <div class="ai-composer-bottom"><div class="ai-tools"><button class="ai-tool" id="aiAttach" type="button" title="Attach photos or files">＋ <span>Attach</span></button><input id="aiFiles" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,.pdf,.docx,.txt,.md,.csv,.json"><span class="ai-upload-hint">Photos · PDF · DOCX · TXT · CSV · JSON</span></div><button class="btn primary" id="aiSend" type="button">Send ↑</button></div>
+        </div>
+        <div class="ai-foot"><span>Private conversation · saved in your dashboard</span><span id="aiModelLabel">Model status pending</span></div>
+      </div>
+      <article class="card ai-settings-panel hidden" id="aiSettingsPanel">
+        <div class="card-head"><div><h2>Chat settings</h2><p>Choose how Spectrum responds. Changes are saved to your account.</p></div><button class="small-btn" id="aiSettingsClose" type="button">Close ×</button></div>
+        <div class="ai-settings-grid">
+          <label class="ai-setting"><span>Model mode</span><select id="aiModelMode"><option value="auto">Auto · fast text / vision for images</option><option value="fast">Fast text model</option><option value="vision">Vision model</option></select><small>Auto is fastest for normal chat and switches to vision when you attach a photo.</small></label>
+          <label class="ai-setting"><span>Assistant tone</span><select id="aiTone"><option value="balanced">Balanced</option><option value="casual">Casual</option><option value="professional">Professional</option><option value="creative">Creative</option></select></label>
+          <label class="ai-setting"><span>Answer length</span><select id="aiResponseLength"><option value="concise">Concise</option><option value="normal">Balanced detail</option><option value="detailed">Detailed</option></select></label>
+          <label class="ai-setting"><span>Context window</span><select id="aiContextSize"><option value="2048">2K · lower memory / faster</option><option value="4096">4K · balanced</option><option value="8192">8K · longer context</option></select></label>
+          <label class="ai-setting"><span>Conversation memory <output id="aiHistoryCountValue">12 messages</output></span><input id="aiHistoryCount" type="range" min="4" max="30" step="2" value="12"><small>How many earlier messages to include with each reply.</small></label>
+          <label class="ai-setting"><span>Creativity <output id="aiTemperatureValue">0.65</output></span><input id="aiTemperature" type="range" min="0.1" max="1.2" step="0.05" value="0.65"><small>Lower is more consistent; higher is more varied.</small></label>
+          <label class="ai-setting"><span>Maximum answer size <output id="aiMaxTokensValue">768 tokens</output></span><input id="aiMaxTokens" type="range" min="128" max="2048" step="64" value="768"></label>
+          <label class="ai-setting ai-setting-toggle"><span><b>Use conversation history</b><small>Let Spectrum refer to earlier messages in this chat.</small></span><input id="aiUseHistory" type="checkbox" checked></label>
+        </div>
+        <div class="ai-settings-actions"><button class="btn primary" id="aiSaveSettings" type="button">Save chat settings</button><button class="btn" id="aiResetSettings" type="button">Reset defaults</button></div>
       </article>
-      <div class="callout section-gap"><strong>Connection note:</strong> your computer must stay awake with the AI gateway and secure tunnel running for Spectrum to answer. The dashboard itself remains hosted on Railway.</div>
+      <p class="ai-disclaimer">Spectrum runs on your computer. Keep your PC awake and the secure AI connection online. Image understanding uses the vision model; supported documents are read and included with your message.</p>
     </section>
 
     <section class="view" id="view-alerts">
@@ -401,14 +452,14 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 </div>
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 <script>
-const state={view:"overview",config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0,aiMessages:[],aiLoaded:false,aiBusy:false};
+const state={view:"overview",config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0,aiMessages:[],aiLoaded:false,aiBusy:false,aiAttachments:[],aiPreferences:null};
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const titles={ai:["Spectrum AI","Your private local AI assistant."],overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],servers:["Server manager","Manage your hosted application services."],settings:["Settings","Dashboard and account preferences."],logs:["System logs","Search and review bot events, warnings, and errors."]};
 function getSavedTheme(){try{const value=window.localStorage.getItem("socialWatchTheme");return ["dark","light","ocean","purple"].includes(value)?value:"dark"}catch(e){return"dark"}}
 function applyTheme(theme,save=true){const allowed=["dark","light","ocean","purple"];const value=allowed.includes(theme)?theme:"dark";state.theme=value;document.documentElement.setAttribute("data-theme",value);const select=$("themeSelect");if(select)select.value=value;const meta=$("browserThemeColor");if(meta)meta.setAttribute("content",value==="light"?"#f3f6fb":value==="ocean"?"#071820":value==="purple"?"#160e22":"#080808");if(save){try{window.localStorage.setItem("socialWatchTheme",value)}catch(e){/* Private browsing may block storage; theme still works for this page. */}}}
 function toast(message,error=false){const node=document.createElement("div");node.className="toast"+(error?" error":"");node.textContent=message;$("toastStack").appendChild(node);setTimeout(()=>node.remove(),4300)}
-async function api(url,options={}){const response=await fetch(url,{cache:"no-store",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});if(response.status===401){location.href="/login";throw new Error("Your session expired.")}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||("Request failed: "+response.status));return data}
+async function api(url,options={}){const headers={...(options.headers||{})};if(!(options.body instanceof FormData)&&!headers["Content-Type"])headers["Content-Type"]="application/json";const response=await fetch(url,{cache:"no-store",...options,headers});if(response.status===401){location.href="/login";throw new Error("Your session expired.")}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||("Request failed: "+response.status));return data}
 function switchView(view){if(!titles[view]){toast("This dashboard page is not available.",true);return}const target=$("view-"+view);if(!target){toast("The "+titles[view][0]+" page is missing from this dashboard build.",true);return}state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node===target));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="logs")loadLogs().catch(e=>toast(e.message,true));if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations();if(view==="servers")refreshServerStatus().catch(e=>toast(e.message,true));if(view==="ai")loadAI().catch(e=>toast(e.message,true))}
 const accountMenuBtn=$("accountMenuBtn"),accountDropdown=$("accountDropdown");accountMenuBtn?.addEventListener("click",event=>{event.stopPropagation();const opening=accountDropdown.classList.contains("hidden");accountDropdown.classList.toggle("hidden",!opening);accountMenuBtn.setAttribute("aria-expanded",String(opening));});document.addEventListener("click",event=>{if(accountDropdown&&!accountDropdown.contains(event.target)&&event.target!==accountMenuBtn){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("keydown",event=>{if(event.key==="Escape"){accountDropdown?.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("click",event=>{const button=event.target instanceof Element?event.target.closest("[data-view],[data-go]"):null;if(!button)return;const view=button.dataset.view||button.dataset.go;if(!view)return;event.preventDefault();switchView(view);if(accountDropdown){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}},true);
 function priorityMarkup(value){const p=["high","medium","normal"].includes(value)?value:"normal";return '<span class="priority '+p+'">'+esc(p)+'</span>'}
@@ -488,33 +539,76 @@ $("runServerAction").addEventListener("click",async()=>{
 refreshServerStatus();
 
 
+
 function renderAIMessages(){
   const node=$("aiMessages");
-  if(!state.aiMessages.length){node.innerHTML='<div class="empty">Spectrum is ready when you are. Send a message to start a conversation.</div>';return}
-  node.innerHTML=state.aiMessages.map(item=>'<div class="ai-message '+(item.role==="user"?"user":"assistant")+'"><span class="ai-role">'+(item.role==="user"?"You":"Spectrum")+'</span>'+esc(item.content)+'</div>').join("");
+  if(!state.aiMessages.length){node.innerHTML='<div class="empty">What can I help with?</div>';return}
+  node.innerHTML=state.aiMessages.map(item=>'<div class="ai-message '+(item.role==="user"?"user":"assistant")+'"><span class="ai-role">'+(item.role==="user"?"You":"Spectrum")+'</span><div>'+esc(item.content).replace(/```([\s\S]*?)```/g,'<pre>$1</pre>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')+'</div></div>').join("");
   node.scrollTop=node.scrollHeight;
 }
+function renderAIAttachments(){
+  const tray=$("aiAttachmentTray");tray.innerHTML="";
+  tray.classList.toggle("hidden",!state.aiAttachments.length);
+  state.aiAttachments.forEach((file,index)=>{
+    const item=document.createElement("div");item.className="ai-attachment";
+    if(file.type.startsWith("image/")){const img=document.createElement("img");img.src=URL.createObjectURL(file);item.appendChild(img)}
+    const name=document.createElement("span");name.textContent=file.name+" · "+(file.size/1024).toFixed(0)+" KB";item.appendChild(name);
+    const remove=document.createElement("button");remove.type="button";remove.textContent="×";remove.setAttribute("aria-label","Remove "+file.name);remove.addEventListener("click",()=>{state.aiAttachments.splice(index,1);renderAIAttachments()});item.appendChild(remove);tray.appendChild(item);
+  });
+}
 async function loadAI(){
-  const [status,history]=await Promise.all([api("/api/ai/status"),api("/api/ai/history")]);
+  const [status,history,settings]=await Promise.all([api("/api/ai/status"),api("/api/ai/history"),api("/api/ai/settings")]);
   $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(status.ready?"var(--green)":"var(--amber)")+'"></span>'+(status.ready?"Local model online":"Local model offline");
   $("aiModelLabel").textContent=status.model+" · "+status.provider;
-  state.aiMessages=history.messages||[];state.aiLoaded=true;renderAIMessages();
+  state.aiMessages=history.messages||[];state.aiLoaded=true;state.aiPreferences=settings.preferences;populateAISettings(settings.preferences);renderAIMessages();
 }
+function populateAISettings(p){
+  $("aiModelMode").value=p.modelMode;$("aiTone").value=p.tone;$("aiResponseLength").value=p.responseLength;
+  $("aiContextSize").value=String(p.contextSize);$("aiHistoryCount").value=p.historyMessages;
+  $("aiTemperature").value=p.temperature;$("aiMaxTokens").value=p.maxTokens;$("aiUseHistory").checked=p.useHistory;
+  $("aiHistoryCountValue").textContent=p.historyMessages+" messages";$("aiTemperatureValue").textContent=Number(p.temperature).toFixed(2);$("aiMaxTokensValue").textContent=p.maxTokens+" tokens";
+}
+function readAISettings(){return {modelMode:$("aiModelMode").value,tone:$("aiTone").value,responseLength:$("aiResponseLength").value,contextSize:Number($("aiContextSize").value),historyMessages:Number($("aiHistoryCount").value),temperature:Number($("aiTemperature").value),maxTokens:Number($("aiMaxTokens").value),useHistory:$("aiUseHistory").checked}}
+async function saveAISettings(){
+  try{const data=await api("/api/ai/settings",{method:"PUT",body:JSON.stringify({preferences:readAISettings()})});state.aiPreferences=data.preferences;populateAISettings(data.preferences);toast("Chat settings saved.");$("aiSettingsPanel").classList.add("hidden")}
+  catch(error){toast(error.message,true)}
+}
+$("aiSettingsToggle").addEventListener("click",()=>{$("aiSettingsPanel").classList.toggle("hidden");$("aiSettingsPanel").scrollIntoView({behavior:"smooth",block:"nearest"})});
+$("aiSettingsClose").addEventListener("click",()=>$("aiSettingsPanel").classList.add("hidden"));
+$("aiSaveSettings").addEventListener("click",saveAISettings);
+$("aiResetSettings").addEventListener("click",()=>populateAISettings({modelMode:"auto",tone:"balanced",responseLength:"normal",contextSize:4096,historyMessages:12,temperature:.65,maxTokens:768,useHistory:true}));
+$("aiHistoryCount").addEventListener("input",()=>{$("aiHistoryCountValue").textContent=$("aiHistoryCount").value+" messages"});
+$("aiTemperature").addEventListener("input",()=>{$("aiTemperatureValue").textContent=Number($("aiTemperature").value).toFixed(2)});
+$("aiMaxTokens").addEventListener("input",()=>{$("aiMaxTokensValue").textContent=$("aiMaxTokens").value+" tokens"});
+$("aiAttach").addEventListener("click",()=>$("aiFiles").click());
+$("aiFiles").addEventListener("change",event=>{
+  const chosen=Array.from(event.target.files||[]);const valid=chosen.filter(file=>file.size<=6*1024*1024);
+  if(valid.length!==chosen.length)toast("Each file must be 6 MB or smaller.",true);
+  const remaining=Math.max(0,5-state.aiAttachments.length);
+  if(valid.length>remaining)toast("You can attach up to 5 files per message.",true);
+  state.aiAttachments.push(...valid.slice(0,remaining));renderAIAttachments();event.target.value="";
+});
 async function sendAIMessage(){
   if(state.aiBusy)return;
-  const input=$("aiInput");const message=input.value.trim();if(!message)return;
-  state.aiBusy=true;$("aiSend").disabled=true;$("aiSend").textContent="Thinking…";
-  state.aiMessages.push({role:"user",content:message});input.value="";renderAIMessages();
-  const pending=document.createElement("div");pending.className="ai-message assistant";pending.innerHTML='<span class="ai-role">Spectrum</span>Thinking…';$("aiMessages").appendChild(pending);$("aiMessages").scrollTop=$("aiMessages").scrollHeight;
+  const input=$("aiInput");const message=input.value.trim();if(!message&&!state.aiAttachments.length)return;
+  state.aiBusy=true;$("aiSend").disabled=true;$("aiSend").textContent="Working…";
+  const files=[...state.aiAttachments];const shown=message+(files.length?"\n[Attachments: "+files.map(file=>file.name).join(", ")+"]":"");
+  state.aiMessages.push({role:"user",content:shown});input.value="";state.aiAttachments=[];renderAIAttachments();renderAIMessages();
+  const pending=document.createElement("div");pending.className="ai-message assistant";pending.innerHTML='<span class="ai-role">Spectrum</span><div>Thinking…</div>';$("aiMessages").appendChild(pending);$("aiMessages").scrollTop=$("aiMessages").scrollHeight;
   try{
-    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message})});
-    pending.remove();state.aiMessages.push({role:"assistant",content:data.reply});renderAIMessages();
-  }catch(error){
-    pending.remove();state.aiMessages.pop();state.aiMessages.push({role:"assistant",content:"I couldn't reach the local model. "+error.message});renderAIMessages();toast(error.message,true);
-  }finally{state.aiBusy=false;$("aiSend").disabled=false;$("aiSend").textContent="Send ↗";input.focus()}
+    const form=new FormData();form.append("message",message);files.forEach(file=>form.append("files",file,file.name));
+    const data=await api("/api/ai/chat",{method:"POST",body:form});
+    pending.remove();state.aiMessages.push({role:"assistant",content:data.reply});$("aiModelLabel").textContent=data.model+" · local";renderAIMessages();
+  }catch(error){pending.remove();state.aiMessages.pop();state.aiMessages.push({role:"assistant",content:"I couldn't complete that request. "+error.message});renderAIMessages();toast(error.message,true)}
+  finally{state.aiBusy=false;$("aiSend").disabled=false;$("aiSend").textContent="Send ↑";input.focus()}
 }
 $("aiSend").addEventListener("click",sendAIMessage);
 $("aiInput").addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendAIMessage()}});
+$("aiNewChat").addEventListener("click",async()=>{
+  if(!confirm("Clear the saved Spectrum conversation and start fresh?"))return;
+  try{await api("/api/ai/history",{method:"DELETE",body:"{}"});state.aiMessages=[];renderAIMessages();toast("New conversation started.")}
+  catch(error){toast(error.message,true)}
+});
 function cryptoRandomId(){return"rule-"+Math.random().toString(36).slice(2,10)}
 $("saveKeywordsTop").addEventListener("click",()=>saveConfig("Keyword rules saved. The bot will sync in about 60 seconds."));
 function captureAutomationControls(){const a=state.config.automations;a.discordChannelAlertsEnabled=$("discordAlertsToggle").checked;a.homeAssistantAnnouncementsEnabled=$("nestEnabledToggle").checked;a.nestAnnouncementMode=$("nestMode").value;a.quietHoursEnabled=$("quietEnabledToggle").checked;a.quietHoursStart=$("quietStart").value||"22:00";a.quietHoursEnd=$("quietEnd").value||"07:00";a.timezone=$("timezone").value}
