@@ -33,7 +33,7 @@ Add reviewed JSONL records to `data/train.jsonl`. Each line is one JSON object:
 {"messages":[{"role":"user","content":"Explain what a Python dictionary is."},{"role":"assistant","content":"A dictionary stores key-value pairs..."}]}
 ```
 
-Use examples you have rights to use. Do not put secrets, personal records, or private user conversations into training data without appropriate consent. Keep a separate held-out evaluation set; do not train on it.
+Use examples you have rights to use. Do not put secrets, personal records, or private user conversations into training data without appropriate consent. Keep a separate, larger held-out evaluation set for final model comparisons; do not train on it. The script's small automatic split is only an early training check.
 
 The included data file is only a tiny format/demo sample, **not enough to produce a useful model**. Build a varied, quality-reviewed dataset before training.
 
@@ -43,7 +43,7 @@ The included data file is only a tiny format/demo sample, **not enough to produc
 python train_lora.py --data data/train.jsonl --output outputs/spectrum-qwen25-7b-lora --model Qwen/Qwen2.5-7B --epochs 1
 ```
 
-The script writes a PEFT adapter, not a complete merged model. Keep the original checkpoint and adapter separate until evaluation passes. To serve through Ollama, merge the adapter into a compatible model in a separate, versioned step, convert/import it, and test it before changing the production gateway.
+The script masks prompt tokens so loss is applied to the final assistant answer, uses dynamic padding, and holds out a small evaluation split when the dataset has at least five records. The script writes a PEFT adapter, not a complete merged model. Keep the original checkpoint and adapter separate until evaluation passes. To serve through Ollama, merge the adapter into a compatible model in a separate, versioned step, convert/import it, and test it before changing the production gateway.
 
 ## Evaluation and release gate
 
