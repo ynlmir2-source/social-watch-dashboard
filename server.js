@@ -554,15 +554,16 @@ app.get("/", requireLogin, (req, res) => {
 function getAIConfig() {
   return {
     apiKey: process.env.AI_API_KEY || "",
-    baseUrl: (process.env.AI_BASE_URL || "https://api.openai.com/v1").replace(/\\/+$/, ""),
-    model: process.env.AI_MODEL || "",
+    baseUrl: (process.env.AI_BASE_URL || "https://router.huggingface.co/v1").replace(/\\/+$/, ""),
+    model: process.env.AI_MODEL || "Qwen/Qwen3-4B-Thinking-2507:fastest",
   };
 }
 
 app.get("/api/ai/status", requireLogin, (req, res) => {
   const config = getAIConfig();
   res.set("Cache-Control", "no-store");
-  res.json({ configured: Boolean(config.apiKey && config.model), provider: config.apiKey ? "OpenAI-compatible API" : "Not connected", model: config.model || null });
+  const provider = config.baseUrl.includes("router.huggingface.co") ? "Hugging Face Inference Providers" : "OpenAI-compatible API";
+  res.json({ configured: Boolean(config.apiKey && config.model), provider: config.apiKey ? provider : "Not connected", model: config.model || null });
 });
 
 app.post("/api/ai/chat", requireLogin, requireSameOrigin, async (req, res) => {
