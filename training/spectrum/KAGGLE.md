@@ -35,7 +35,7 @@ assert sum(1 for line in DATA_FILE.read_text(encoding="utf-8").splitlines() if l
 
 Start a conservative first run. A 7B model may exceed the memory available on some free GPU types; if it does, stop the run rather than enabling paid hardware. A smaller sequence length can reduce memory use, but it does not guarantee a fit:
 
-```bash
+```python
 !python train_lora.py --data {DATA_FILE} --output /kaggle/working/spectrum-qwen25-7b-lora --model Qwen/Qwen2.5-7B --epochs 1 --max-length 1024 --batch-size 1 --grad-accum 16
 ```
 
