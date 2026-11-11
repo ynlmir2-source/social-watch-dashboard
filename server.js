@@ -1350,18 +1350,30 @@ async function getAIPreferences(username) {
 }
 app.get("/api/ai/status", requireLogin, async (req, res) => {
   const configured = Boolean(process.env.AI_GATEWAY_URL && process.env.AI_GATEWAY_TOKEN);
-  if (!configured) return res.json({ ready: false, provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b" });
+  const model = process.env.AI_MODEL || "qwen2.5:7b";
+  const visionModel = process.env.AI_VISION_MODEL || "qwen2.5vl:3b";
+  if (!configured) return res.json({ ready: false, visionReady: false, provider: "local Ollama", model, visionModel });
   try {
-    const response = await fetch(process.env.AI_GATEWAY_URL.replace(/\/$/, "") + "/health", {
-      headers: { Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN }, signal: AbortSignal.timeout(5000),
-    });
-    const health = await response.json().catch(() => ({}));
+    const headers = { Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN };
+    const base = process.env.AI_GATEWAY_URL.replace(/\/$/, "");
+    const [healthResponse, tagsResponse] = await Promise.all([
+      fetch(base + "/health", { headers, signal: AbortSignal.timeout(5000) }),
+      fetch(base + "/api/tags", { headers, signal: AbortSignal.timeout(7000) }),
+    ]);
+    const health = await healthResponse.json().catch(() => ({}));
+    const tags = await tagsResponse.json().catch(() => ({}));
+    const installed = Array.isArray(tags.models) ? tags.models.map((item) => String(item.name || "").split(":")[0] + (String(item.name || "").includes(":") ? ":" + String(item.name).split(":").slice(1).join(":") : "")) : [];
     res.set("Cache-Control", "no-store");
-    res.json({ ready: response.ok && health.status === "ok", provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b", visionModel: process.env.AI_VISION_MODEL || "qwen2.5vl:7b" });
+    res.json({
+      ready: healthResponse.ok && health.status === "ok",
+      visionReady: tagsResponse.ok && installed.includes(visionModel),
+      provider: "local Ollama", model, visionModel,
+    });
   } catch {
-    res.json({ ready: false, provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b", visionModel: process.env.AI_VISION_MODEL || "qwen2.5vl:7b" });
+    res.json({ ready: false, visionReady: false, provider: "local Ollama", model, visionModel });
   }
 });
+
 app.get("/api/ai/settings", requireLogin, async (req, res) => {
   try { res.set("Cache-Control", "no-store"); res.json({ preferences: await getAIPreferences(req.user.username) }); }
   catch (error) { console.error("AI preferences load failed:", error.message); res.status(500).json({ error: "Unable to load chat settings." }); }
