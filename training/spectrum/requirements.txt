@@ -1,0 +1,8 @@
+# Install in a Linux environment with a compatible NVIDIA CUDA runtime.
+# Install a matching PyTorch build separately from https://pytorch.org/get-started/locally/
+transformers==4.46.3
+datasets==3.1.0
+peft==0.13.2
+accelerate==1.1.1
+bitsandbytes==0.44.1
+safetensors==0.4.5
