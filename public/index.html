@@ -219,6 +219,17 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 .log-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:10px}
 @media(max-width:760px){.log-card{grid-template-columns:1fr;gap:8px}.log-level{justify-self:start}.stats-grid[style*="repeat(3"]{grid-template-columns:1fr!important}}
 
+
+.ai-shell{display:flex;flex-direction:column;gap:14px}
+.ai-messages{display:flex;flex-direction:column;gap:12px;min-height:260px;max-height:55vh;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--field)}
+.ai-message{max-width:min(88%,760px);padding:12px 14px;border-radius:13px;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-message.user{align-self:flex-end;background:#25351f;border:1px solid #3b5b31;color:#f0ffe9}
+.ai-message.assistant{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+.ai-message .ai-role{display:block;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.ai-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.ai-compose textarea{width:100%;resize:vertical;min-height:76px}
+.ai-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:10px}
+@media(max-width:600px){.ai-compose{grid-template-columns:1fr}.ai-compose button{width:100%}.ai-message{max-width:96%}}
 </style>
 </head>
 <body>
@@ -227,6 +238,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
   <div class="brand"><div class="brand-mark">◎</div><div><div class="brand-title">Social Watch</div><div class="brand-sub">CONTROL CENTER</div></div></div>
   <div><div class="nav-label">Workspace</div><nav id="sideNav">
     <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span>Overview</button>
+    <button class="nav-btn" data-view="ai"><span class="nav-icon">✦</span>Spectrum AI</button>
     <button class="nav-btn" data-view="alerts"><span class="nav-icon">◈</span>Alert inbox<span class="nav-count" id="navUnread">0</span></button>
     <button class="nav-btn" data-view="logs"><span class="nav-icon">≡</span>System logs<span class="nav-count" id="navLogCount">0</span></button>
     <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Keywords & rules</button>
@@ -240,7 +252,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 <div class="main">
   <header class="topbar">
     <div><div class="top-title" id="topTitle">Overview</div><div class="top-sub" id="topSub">Your monitoring, at a glance.</div></div>
-    <div class="top-actions"><span id="healthChip" class="status-chip"><span class="pulse-dot"></span>Checking status</span><button class="icon-btn" id="refreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button><div class="account-menu-wrap"><button class="btn ghost" id="accountMenuBtn" type="button" aria-expanded="false" aria-controls="accountDropdown">Account ▾</button><div class="account-dropdown hidden" id="accountDropdown" role="menu"><div class="dropdown-heading">Navigate</div><button class="dropdown-item" data-view="overview" role="menuitem">⌂ Overview</button><button class="dropdown-item" data-view="alerts" role="menuitem">◈ Alerts</button><button class="dropdown-item" data-view="logs" role="menuitem">≡ System logs</button><button class="dropdown-item" data-view="keywords" role="menuitem">⌕ Keywords &amp; rules</button><button class="dropdown-item" data-view="automations" role="menuitem">⤳ Automations</button><button class="dropdown-item" data-view="integrations" role="menuitem">▦ Integrations</button><button class="dropdown-item" data-view="servers" role="menuitem">⚙ Server manager</button><button class="dropdown-item" data-view="settings" role="menuitem">⚙ Settings</button><div class="dropdown-divider"></div><form method="POST" action="/logout"><button class="dropdown-item logout-item" type="submit">Log out</button></form></div></div></div>
+    <div class="top-actions"><span id="healthChip" class="status-chip"><span class="pulse-dot"></span>Checking status</span><button class="icon-btn" id="refreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button><div class="account-menu-wrap"><button class="btn ghost" id="accountMenuBtn" type="button" aria-expanded="false" aria-controls="accountDropdown">Account ▾</button><div class="account-dropdown hidden" id="accountDropdown" role="menu"><div class="dropdown-heading">Navigate</div><button class="dropdown-item" data-view="overview" role="menuitem">⌂ Overview</button><button class="dropdown-item" data-view="ai" role="menuitem">✦ Spectrum AI</button><button class="dropdown-item" data-view="alerts" role="menuitem">◈ Alerts</button><button class="dropdown-item" data-view="logs" role="menuitem">≡ System logs</button><button class="dropdown-item" data-view="keywords" role="menuitem">⌕ Keywords &amp; rules</button><button class="dropdown-item" data-view="automations" role="menuitem">⤳ Automations</button><button class="dropdown-item" data-view="integrations" role="menuitem">▦ Integrations</button><button class="dropdown-item" data-view="servers" role="menuitem">⚙ Server manager</button><button class="dropdown-item" data-view="settings" role="menuitem">⚙ Settings</button><div class="dropdown-divider"></div><form method="POST" action="/logout"><button class="dropdown-item logout-item" type="submit">Log out</button></form></div></div></div>
   </header>
   <main class="content">
     <section class="view active" id="view-overview">
@@ -263,6 +275,18 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
           <div class="card quick-card" data-go="integrations"><div class="quick-icon">⌘</div><div><h3>Connection status</h3><p>Check Discord bot and Home Assistant check-ins.</p></div></div>
         </div></article>
       </div>
+    </section>
+
+
+    <section class="view" id="view-ai">
+      <div class="page-head"><div><div class="eyebrow">Local intelligence</div><h1>Spectrum AI</h1><p class="lead">Your private assistant, powered by the Qwen 2.5 7B model running on your computer.</p></div><span class="status-chip" id="aiStatus"><span class="pulse-dot" style="background:var(--amber)"></span>Checking local model</span></div>
+      <article class="card ai-shell">
+        <div class="card-head"><div><h2>Private AI conversation</h2><p>Conversation history is stored in your Social Watch PostgreSQL database.</p></div><span class="priority normal">QWEN 2.5 · 7B</span></div>
+        <div class="ai-messages" id="aiMessages" aria-live="polite"><div class="empty">Loading your conversation…</div></div>
+        <div class="ai-compose"><textarea id="aiInput" rows="3" maxlength="8000" placeholder="Ask Spectrum anything…" aria-label="Message Spectrum AI"></textarea><button class="btn primary" id="aiSend" type="button">Send ↗</button></div>
+        <div class="ai-foot"><span>Local model · authenticated private gateway</span><span id="aiModelLabel">Model status pending</span></div>
+      </article>
+      <div class="callout section-gap"><strong>Connection note:</strong> your computer must stay awake with the AI gateway and secure tunnel running for Spectrum to answer. The dashboard itself remains hosted on Railway.</div>
     </section>
 
     <section class="view" id="view-alerts">
@@ -377,15 +401,15 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 </div>
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 <script>
-const state={view:"overview",config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0};
+const state={view:"overview",config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0,aiMessages:[],aiLoaded:false,aiBusy:false};
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const titles={overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],servers:["Server manager","Manage your hosted application services."],settings:["Settings","Dashboard and account preferences."],logs:["System logs","Search and review bot events, warnings, and errors."]};
+const titles={ai:["Spectrum AI","Your private local AI assistant."],overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],servers:["Server manager","Manage your hosted application services."],settings:["Settings","Dashboard and account preferences."],logs:["System logs","Search and review bot events, warnings, and errors."]};
 function getSavedTheme(){try{const value=window.localStorage.getItem("socialWatchTheme");return ["dark","light","ocean","purple"].includes(value)?value:"dark"}catch(e){return"dark"}}
 function applyTheme(theme,save=true){const allowed=["dark","light","ocean","purple"];const value=allowed.includes(theme)?theme:"dark";state.theme=value;document.documentElement.setAttribute("data-theme",value);const select=$("themeSelect");if(select)select.value=value;const meta=$("browserThemeColor");if(meta)meta.setAttribute("content",value==="light"?"#f3f6fb":value==="ocean"?"#071820":value==="purple"?"#160e22":"#080808");if(save){try{window.localStorage.setItem("socialWatchTheme",value)}catch(e){/* Private browsing may block storage; theme still works for this page. */}}}
 function toast(message,error=false){const node=document.createElement("div");node.className="toast"+(error?" error":"");node.textContent=message;$("toastStack").appendChild(node);setTimeout(()=>node.remove(),4300)}
 async function api(url,options={}){const response=await fetch(url,{cache:"no-store",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});if(response.status===401){location.href="/login";throw new Error("Your session expired.")}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||("Request failed: "+response.status));return data}
-function switchView(view){if(!titles[view]){toast("This dashboard page is not available.",true);return}const target=$("view-"+view);if(!target){toast("The "+titles[view][0]+" page is missing from this dashboard build.",true);return}state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node===target));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="logs")loadLogs().catch(e=>toast(e.message,true));if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations();if(view==="servers")refreshServerStatus().catch(e=>toast(e.message,true))}
+function switchView(view){if(!titles[view]){toast("This dashboard page is not available.",true);return}const target=$("view-"+view);if(!target){toast("The "+titles[view][0]+" page is missing from this dashboard build.",true);return}state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node===target));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="logs")loadLogs().catch(e=>toast(e.message,true));if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations();if(view==="servers")refreshServerStatus().catch(e=>toast(e.message,true));if(view==="ai")loadAI().catch(e=>toast(e.message,true))}
 const accountMenuBtn=$("accountMenuBtn"),accountDropdown=$("accountDropdown");accountMenuBtn?.addEventListener("click",event=>{event.stopPropagation();const opening=accountDropdown.classList.contains("hidden");accountDropdown.classList.toggle("hidden",!opening);accountMenuBtn.setAttribute("aria-expanded",String(opening));});document.addEventListener("click",event=>{if(accountDropdown&&!accountDropdown.contains(event.target)&&event.target!==accountMenuBtn){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("keydown",event=>{if(event.key==="Escape"){accountDropdown?.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("click",event=>{const button=event.target instanceof Element?event.target.closest("[data-view],[data-go]"):null;if(!button)return;const view=button.dataset.view||button.dataset.go;if(!view)return;event.preventDefault();switchView(view);if(accountDropdown){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}},true);
 function priorityMarkup(value){const p=["high","medium","normal"].includes(value)?value:"normal";return '<span class="priority '+p+'">'+esc(p)+'</span>'}
 function timeAgo(value){if(!value)return"Never";const date=new Date(value);if(Number.isNaN(date.getTime()))return"Unknown";const seconds=Math.max(0,Math.round((Date.now()-date.getTime())/1000));if(seconds<60)return"Just now";if(seconds<3600)return Math.floor(seconds/60)+"m ago";if(seconds<86400)return Math.floor(seconds/3600)+"h ago";return date.toLocaleDateString()+" "+date.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
@@ -463,6 +487,34 @@ $("runServerAction").addEventListener("click",async()=>{
 });
 refreshServerStatus();
 
+
+function renderAIMessages(){
+  const node=$("aiMessages");
+  if(!state.aiMessages.length){node.innerHTML='<div class="empty">Spectrum is ready when you are. Send a message to start a conversation.</div>';return}
+  node.innerHTML=state.aiMessages.map(item=>'<div class="ai-message '+(item.role==="user"?"user":"assistant")+'"><span class="ai-role">'+(item.role==="user"?"You":"Spectrum")+'</span>'+esc(item.content)+'</div>').join("");
+  node.scrollTop=node.scrollHeight;
+}
+async function loadAI(){
+  const [status,history]=await Promise.all([api("/api/ai/status"),api("/api/ai/history")]);
+  $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(status.ready?"var(--green)":"var(--amber)")+'"></span>'+(status.ready?"Local model online":"Local model offline");
+  $("aiModelLabel").textContent=status.model+" · "+status.provider;
+  state.aiMessages=history.messages||[];state.aiLoaded=true;renderAIMessages();
+}
+async function sendAIMessage(){
+  if(state.aiBusy)return;
+  const input=$("aiInput");const message=input.value.trim();if(!message)return;
+  state.aiBusy=true;$("aiSend").disabled=true;$("aiSend").textContent="Thinking…";
+  state.aiMessages.push({role:"user",content:message});input.value="";renderAIMessages();
+  const pending=document.createElement("div");pending.className="ai-message assistant";pending.innerHTML='<span class="ai-role">Spectrum</span>Thinking…';$("aiMessages").appendChild(pending);$("aiMessages").scrollTop=$("aiMessages").scrollHeight;
+  try{
+    const data=await api("/api/ai/chat",{method:"POST",body:JSON.stringify({message})});
+    pending.remove();state.aiMessages.push({role:"assistant",content:data.reply});renderAIMessages();
+  }catch(error){
+    pending.remove();state.aiMessages.pop();state.aiMessages.push({role:"assistant",content:"I couldn't reach the local model. "+error.message});renderAIMessages();toast(error.message,true);
+  }finally{state.aiBusy=false;$("aiSend").disabled=false;$("aiSend").textContent="Send ↗";input.focus()}
+}
+$("aiSend").addEventListener("click",sendAIMessage);
+$("aiInput").addEventListener("keydown",event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendAIMessage()}});
 function cryptoRandomId(){return"rule-"+Math.random().toString(36).slice(2,10)}
 $("saveKeywordsTop").addEventListener("click",()=>saveConfig("Keyword rules saved. The bot will sync in about 60 seconds."));
 function captureAutomationControls(){const a=state.config.automations;a.discordChannelAlertsEnabled=$("discordAlertsToggle").checked;a.homeAssistantAnnouncementsEnabled=$("nestEnabledToggle").checked;a.nestAnnouncementMode=$("nestMode").value;a.quietHoursEnabled=$("quietEnabledToggle").checked;a.quietHoursStart=$("quietStart").value||"22:00";a.quietHoursEnd=$("quietEnd").value||"07:00";a.timezone=$("timezone").value}
