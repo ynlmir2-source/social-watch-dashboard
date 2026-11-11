@@ -558,7 +558,7 @@ function renderAIAttachments(){
 }
 async function loadAI(){
   const [status,history,settings]=await Promise.all([api("/api/ai/status"),api("/api/ai/history"),api("/api/ai/settings")]);
-  $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(status.ready?"var(--green)":"var(--amber)")+'"></span>'+(status.ready?"Local model online":"Local model offline");
+  $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(status.ready?(status.visionReady?"var(--green)":"var(--amber)"):"var(--red)")+'"></span>'+(status.ready?(status.visionReady?"Text + vision online":"Text online · vision model installing"):"Local model offline");
   $("aiModelLabel").textContent=status.model+" · "+status.provider;
   state.aiMessages=history.messages||[];state.aiLoaded=true;state.aiPreferences=settings.preferences;populateAISettings(settings.preferences);renderAIMessages();
 }
