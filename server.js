@@ -468,6 +468,19 @@ async function initializeDatabase() {
     ON studio_commands (status, created_at ASC)
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS social_watch_ai_messages (
+      id BIGSERIAL PRIMARY KEY,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS social_watch_ai_messages_created_idx
+    ON social_watch_ai_messages (created_at DESC)
+  `);
+
   const defaults = buildDefaultConfig();
   await pool.query(
     `INSERT INTO social_watch_settings (id, config)
@@ -1283,6 +1296,99 @@ app.post("/api/alerts", requireIngestKey, async (req, res) => {
   } catch (error) {
     console.error("Failed to save alert:", error.message);
     res.status(500).json({ error: "Unable to save alert." });
+  }
+});
+
+
+app.get("/api/ai/status", requireLogin, async (req, res) => {
+  const configured = Boolean(process.env.AI_GATEWAY_URL && process.env.AI_GATEWAY_TOKEN);
+  if (!configured) return res.json({ ready: false, provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b" });
+  try {
+    const response = await fetch(process.env.AI_GATEWAY_URL.replace(/\/$/, "") + "/health", {
+      headers: { Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN },
+      signal: AbortSignal.timeout(8000),
+    });
+    const health = await response.json().catch(() => ({}));
+    res.set("Cache-Control", "no-store");
+    res.json({ ready: response.ok && health.status === "ok", provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b" });
+  } catch {
+    res.json({ ready: false, provider: "local Ollama", model: process.env.AI_MODEL || "qwen2.5:7b" });
+  }
+});
+
+app.get("/api/ai/history", requireLogin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, role, content, created_at FROM social_watch_ai_messages ORDER BY id DESC LIMIT 100"
+    );
+    res.set("Cache-Control", "no-store");
+    res.json({ messages: result.rows.reverse() });
+  } catch (error) {
+    console.error("AI history load failed:", error.message);
+    res.status(500).json({ error: "Unable to load AI conversation history." });
+  }
+});
+
+app.post("/api/ai/chat", requireLogin, requireSameOrigin, async (req, res) => {
+  const content = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!content || content.length > 8000) {
+    return res.status(400).json({ error: "Message is required and must be at most 8000 characters." });
+  }
+  if (!process.env.AI_GATEWAY_URL || !process.env.AI_GATEWAY_TOKEN) {
+    return res.status(503).json({ error: "The local AI connection is not configured." });
+  }
+
+  try {
+    const prior = await pool.query(
+      "SELECT role, content FROM social_watch_ai_messages ORDER BY id DESC LIMIT 20"
+    );
+    const history = prior.rows.reverse().map((row) => ({ role: row.role, content: row.content }));
+    await pool.query(
+      "INSERT INTO social_watch_ai_messages (role, content) VALUES ('user', $1)",
+      [content]
+    );
+
+    const response = await fetch(process.env.AI_GATEWAY_URL.replace(/\/$/, "") + "/api/chat", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.AI_MODEL || "qwen2.5:7b",
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: "You are Spectrum, the private AI assistant inside the Social Watch dashboard. Be helpful, direct, and honest. You may explain and help plan Social Watch operations, but you cannot directly change code, operate the user's computer, or deploy services unless a specific connected action is provided in the current interface. Never claim an action was completed unless it actually was."
+          },
+          ...history,
+          { role: "user", content },
+        ],
+        options: { temperature: 0.7 },
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("Local AI returned status:", response.status);
+      return res.status(502).json({ error: "The local AI model returned an error. Check that the computer and model are online." });
+    }
+    const reply = String(payload.message?.content || "").trim();
+    if (!reply) return res.status(502).json({ error: "The AI model returned an empty response." });
+
+    await pool.query(
+      "INSERT INTO social_watch_ai_messages (role, content) VALUES ('assistant', $1)",
+      [reply]
+    );
+    await pool.query(
+      "DELETE FROM social_watch_ai_messages WHERE id NOT IN (SELECT id FROM social_watch_ai_messages ORDER BY id DESC LIMIT 200)"
+    );
+    res.set("Cache-Control", "no-store");
+    res.json({ reply, model: process.env.AI_MODEL || "qwen2.5:7b" });
+  } catch (error) {
+    console.error("AI chat failed:", error.message);
+    res.status(502).json({ error: "Could not reach the local AI model. Make sure the PC and AI tunnel are running." });
   }
 });
 
