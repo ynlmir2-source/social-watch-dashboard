@@ -1459,6 +1459,17 @@ app.post("/api/ai/chat", requireLogin, requireSameOrigin, aiUpload.array("files"
   }
 });
 
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  if (error instanceof multer.MulterError) {
+    const message = error.code === "LIMIT_FILE_SIZE" ? "Each attachment must be 6 MB or smaller." : "You can attach up to 5 files per message.";
+    return res.status(413).json({ error: message });
+  }
+  if (String(error.message || "").startsWith("Unsupported file type.")) return res.status(400).json({ error: error.message });
+  console.error("Request failed:", error.message);
+  res.status(400).json({ error: "The request could not be processed." });
+});
+
 app.use((req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found." });
   res.status(404).send("Page not found.");
