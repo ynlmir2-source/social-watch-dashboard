@@ -1423,7 +1423,7 @@ app.post("/api/ai/chat", requireLogin, requireSameOrigin, aiUpload.array("files"
     const messageText = (content || "Please review the attached files.") + documentText;
     const imageMode = images.length > 0;
     const model = imageMode || preferences.modelMode === "vision"
-      ? (process.env.AI_VISION_MODEL || "qwen2.5vl:7b")
+      ? (process.env.AI_VISION_MODEL || "qwen2.5vl:3b")
       : (process.env.AI_MODEL || "qwen2.5:7b");
     const prior = preferences.useHistory
       ? await pool.query("SELECT role, content FROM social_watch_ai_messages ORDER BY id DESC LIMIT $1", [preferences.historyMessages])
