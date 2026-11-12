@@ -1352,25 +1352,26 @@ app.get("/api/ai/status", requireLogin, async (req, res) => {
   const configured = Boolean(process.env.AI_GATEWAY_URL && process.env.AI_GATEWAY_TOKEN);
   const model = process.env.AI_MODEL || "qwen2.5:7b";
   const visionModel = process.env.AI_VISION_MODEL || "qwen2.5vl:3b";
-  if (!configured) return res.json({ ready: false, visionReady: false, provider: "local Ollama", model, visionModel });
+  if (!configured) return res.json({ ready: false, modelReady: false, visionReady: false, provider: "local Ollama", model, visionModel });
   try {
     const headers = { Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN };
     const base = process.env.AI_GATEWAY_URL.replace(/\/$/, "");
-    const [healthResponse, tagsResponse] = await Promise.all([
-      fetch(base + "/health", { headers, signal: AbortSignal.timeout(5000) }),
-      fetch(base + "/api/tags", { headers, signal: AbortSignal.timeout(7000) }),
-    ]);
-    const health = await healthResponse.json().catch(() => ({}));
+    // Ollama-compatible gateways are not required to expose a separate /health route.
+    // /api/tags is the authoritative check that the model API is reachable.
+    const tagsResponse = await fetch(base + "/api/tags", { headers, signal: AbortSignal.timeout(7000) });
     const tags = await tagsResponse.json().catch(() => ({}));
-    const installed = Array.isArray(tags.models) ? tags.models.map((item) => String(item.name || "").split(":")[0] + (String(item.name || "").includes(":") ? ":" + String(item.name).split(":").slice(1).join(":") : "")) : [];
+    const installed = Array.isArray(tags.models) ? tags.models.map((item) => String(item.name || "")) : [];
     res.set("Cache-Control", "no-store");
     res.json({
-      ready: healthResponse.ok && health.status === "ok",
+      ready: tagsResponse.ok,
+      modelReady: tagsResponse.ok && installed.includes(model),
       visionReady: tagsResponse.ok && installed.includes(visionModel),
+      installedModels: installed,
       provider: "local Ollama", model, visionModel,
     });
-  } catch {
-    res.json({ ready: false, visionReady: false, provider: "local Ollama", model, visionModel });
+  } catch (error) {
+    const unreachable = error?.name === "AbortError" || error?.name === "TimeoutError" || error?.message === "fetch failed";
+    res.json({ ready: false, modelReady: false, visionReady: false, provider: "local Ollama", model, visionModel, error: unreachable ? "AI gateway unreachable" : "AI status check failed" });
   }
 });
 
@@ -1456,8 +1457,9 @@ app.post("/api/ai/chat", requireLogin, requireSameOrigin, aiUpload.array("files"
     if (!response.ok) {
       console.error("Local AI returned status:", response.status);
       const detail = String(payload.error || "").toLowerCase();
-      if (detail.includes("not found") || detail.includes("pull")) return res.status(503).json({ error: "The selected vision model is not installed yet. Auto mode uses the fast text model unless you attach an image." });
-      return res.status(502).json({ error: "The local AI model returned an error. Check that the computer and model are online." });
+      if (response.status === 413) return res.status(413).json({ error: "The AI gateway rejected this request as too large. Try a smaller attachment or lower the context window in Chat settings." });
+      if (detail.includes("not found") || detail.includes("pull")) return res.status(503).json({ error: "The selected model is not installed in the AI gateway. Check the configured model name or install that model." });
+      return res.status(502).json({ error: "The AI model gateway returned HTTP " + response.status + ". Check the gateway logs and selected model." });
     }
     const reply = String(payload.message?.content || "").trim();
     if (!reply) return res.status(502).json({ error: "The AI model returned an empty response." });
@@ -1466,8 +1468,14 @@ app.post("/api/ai/chat", requireLogin, requireSameOrigin, aiUpload.array("files"
     res.set("Cache-Control", "no-store"); res.json({ reply, model, attachments: names });
   } catch (error) {
     if (error instanceof multer.MulterError) return res.status(413).json({ error: error.code === "LIMIT_FILE_SIZE" ? "Each attachment must be 6 MB or smaller." : "Too many attachments. Add up to 5 files per message." });
-    console.error("AI chat failed:", error.message);
-    res.status(502).json({ error: "Could not process the attachments or reach the local AI model. Check that the PC and AI tunnel are running." });
+    console.error("AI chat failed:", error.message, error?.cause?.code || "");
+    if (error?.name === "AbortError" || error?.name === "TimeoutError") {
+      return res.status(504).json({ error: "The AI model took too long to respond. Try again or reduce the context window." });
+    }
+    if (error?.message === "fetch failed") {
+      return res.status(503).json({ error: "The AI gateway is unreachable. The computer hosting the model or its secure tunnel may be offline; reconnect the AI bridge and try again." });
+    }
+    res.status(502).json({ error: "Could not process the attachments or reach the AI model gateway. Check the gateway connection and try again." });
   }
 });
 
