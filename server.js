@@ -1351,7 +1351,7 @@ async function getAIPreferences(username) {
 app.get("/api/ai/status", requireLogin, async (req, res) => {
   const configured = Boolean(process.env.AI_GATEWAY_URL && process.env.AI_GATEWAY_TOKEN);
   const model = process.env.AI_MODEL || "qwen2.5:7b";
-  const visionModel = process.env.AI_VISION_MODEL || "qwen2.5vl:3b";
+  const visionModel = process.env.AI_VISION_MODEL || "qwen2.5vl:7b";
   if (!configured) return res.json({ ready: false, visionReady: false, provider: "local Ollama", model, visionModel });
   try {
     const headers = { Authorization: "Bearer " + process.env.AI_GATEWAY_TOKEN };
