@@ -233,15 +233,15 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 
 .ai-page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
 .ai-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ai-workspace{width:100%;max-width:930px;margin:0 auto;display:flex;flex-direction:column;min-height:min(70vh,780px)}
-.ai-messages{display:flex;flex-direction:column;gap:20px;min-height:360px;flex:1;overflow:auto;padding:24px 12px 18px;scroll-behavior:smooth}
+.ai-workspace{width:100%;max-width:min(100%,1280px);margin:0 auto;display:flex;flex-direction:column;min-height:min(82vh,980px)}
+.ai-messages{display:flex;flex-direction:column;gap:20px;min-height:min(64vh,720px);flex:1;overflow:auto;padding:28px 16px 22px;scroll-behavior:smooth}
 .ai-message{max-width:88%;font-size:14px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}
 .ai-message.user{align-self:flex-end;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:12px 16px}
 .ai-message.assistant{align-self:stretch;max-width:100%;padding:4px 2px;color:var(--text)}
 .ai-message .ai-role{display:block;font-size:10px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
 .ai-message pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111;padding:12px;border-radius:10px;border:1px solid var(--line)}
 .ai-composer{border:1px solid #444;border-radius:23px;background:var(--panel);padding:12px 14px 10px;box-shadow:0 10px 34px #0002}
-.ai-composer textarea{width:100%;border:0;background:transparent;box-shadow:none!important;resize:none;min-height:58px;max-height:180px;padding:8px 6px;font-size:15px!important;line-height:1.5}
+.ai-composer textarea{width:100%;border:0;background:transparent;box-shadow:none!important;resize:vertical;min-height:88px;max-height:240px;padding:10px 8px;font-size:16px!important;line-height:1.55}
 .ai-composer textarea:focus{border:0}
 .ai-composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .ai-tools{display:flex;align-items:center;gap:10px;min-width:0}
@@ -263,7 +263,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 .ai-setting-toggle small{max-width:340px}
 .ai-settings-actions{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
 .ai-disclaimer{max-width:930px;margin:14px auto 0;color:var(--muted);font-size:10px;line-height:1.6;text-align:center}
-@media(max-width:760px){.ai-page-head{align-items:flex-start;flex-direction:column}.ai-head-actions{width:100%}.ai-head-actions .status-chip{display:inline-flex}.ai-workspace{min-height:65vh}.ai-messages{min-height:300px;padding:14px 3px}.ai-message{max-width:94%;font-size:14px}.ai-settings-grid{grid-template-columns:1fr}.ai-upload-hint{display:none}.ai-composer{padding:9px 10px}.ai-composer textarea{font-size:16px!important}}
+@media(max-width:760px){.ai-page-head{align-items:flex-start;flex-direction:column}.ai-head-actions{width:100%}.ai-head-actions .status-chip{display:inline-flex}.ai-workspace{min-height:78vh}.ai-messages{min-height:58vh;padding:18px 3px}.ai-message{max-width:94%;font-size:14px}.ai-settings-grid{grid-template-columns:1fr}.ai-upload-hint{display:none}.ai-composer{padding:9px 10px}.ai-composer textarea{font-size:16px!important;min-height:76px}}
 </style>
 </head>
 <body>
@@ -558,7 +558,8 @@ function renderAIAttachments(){
 }
 async function loadAI(){
   const [status,history,settings]=await Promise.all([api("/api/ai/status"),api("/api/ai/history"),api("/api/ai/settings")]);
-  $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(status.ready?(status.visionReady?"var(--green)":"var(--amber)"):"var(--red)")+'"></span>'+(status.ready?(status.visionReady?"Text + vision online":"Text online · vision model installing"):"Local model offline");
+  const textReady=!!status.ready&&status.modelReady!==false;
+  $("aiStatus").innerHTML='<span class="pulse-dot" style="background:'+(textReady?(status.visionReady?"var(--green)":"var(--amber)"):(status.ready?"var(--amber)":"var(--red)"))+'"></span>'+(textReady?(status.visionReady?"Text + vision online":"Text online · vision unavailable"):(status.ready?"Gateway online · text model missing":"AI gateway offline"));
   $("aiModelLabel").textContent=status.model+" · "+status.provider;
   state.aiMessages=history.messages||[];state.aiLoaded=true;state.aiPreferences=settings.preferences;populateAISettings(settings.preferences);renderAIMessages();
 }
