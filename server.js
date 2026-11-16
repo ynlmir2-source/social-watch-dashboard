@@ -30,6 +30,27 @@ const nextPageUpload = multer({
   },
 });
 
+function r2Ready() { return Boolean(process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_BUCKET_NAME && process.env.R2_ENDPOINT); }
+function r2Hmac(key, value, encoding) { return crypto.createHmac('sha256', key).update(value, 'utf8').digest(encoding); }
+function r2ObjectUrl(key) { const endpoint = new URL(process.env.R2_ENDPOINT); const base = endpoint.pathname.endsWith('/') ? endpoint.pathname.slice(0, -1) : endpoint.pathname; const objectPath = key ? '/' + key.split('/').map(encodeURIComponent).join('/') : ''; return new URL(endpoint.origin + base + '/' + encodeURIComponent(process.env.R2_BUCKET_NAME) + objectPath); }
+async function r2Request(method, key, body, contentType) {
+  if (!r2Ready()) throw new Error('Cloudflare R2 configuration is incomplete.');
+  const url = r2ObjectUrl(key || ''); const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ''); const dateStamp = amzDate.slice(0, 8);
+  const payload = body || Buffer.alloc(0); const payloadHash = crypto.createHash('sha256').update(payload).digest('hex');
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const canonicalHeaders = 'host:' + url.host + '\n' + 'x-amz-content-sha256:' + payloadHash + '\n' + 'x-amz-date:' + amzDate + '\n';
+  const canonicalRequest = method + '\n' + url.pathname + '\n' + url.searchParams.toString() + '\n' + canonicalHeaders + '\n' + signedHeaders + '\n' + payloadHash;
+  const scope = dateStamp + '/auto/s3/aws4_request';
+  const stringToSign = 'AWS4-HMAC-SHA256\n' + amzDate + '\n' + scope + '\n' + crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+  const kDate = r2Hmac('AWS4' + process.env.R2_SECRET_ACCESS_KEY, dateStamp); const kRegion = r2Hmac(kDate, 'auto'); const kService = r2Hmac(kRegion, 's3'); const kSigning = r2Hmac(kService, 'aws4_request');
+  const signature = r2Hmac(kSigning, stringToSign, 'hex');
+  const headers = { 'x-amz-date': amzDate, 'x-amz-content-sha256': payloadHash, 'Authorization': 'AWS4-HMAC-SHA256 Credential=' + process.env.R2_ACCESS_KEY_ID + '/' + scope + ', SignedHeaders=' + signedHeaders + ', Signature=' + signature };
+  if (contentType) headers['Content-Type'] = contentType;
+  const response = await fetch(url, { method: method, headers: headers, body: method === 'PUT' ? payload : undefined });
+  if (!response.ok) throw new Error('Cloudflare R2 returned HTTP ' + response.status + '.');
+  return response;
+}
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STUDIO_RELAY_TOKEN = process.env.STUDIO_RELAY_TOKEN || "";
@@ -524,12 +545,15 @@ async function initializeDatabase() {
       original_name TEXT NOT NULL,
       mime_type TEXT NOT NULL,
       size_bytes BIGINT NOT NULL,
-      file_data BYTEA NOT NULL,
+      file_data BYTEA,
+      object_key TEXT,
       notes TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS nexpage_assets_created_idx ON nexpage_assets (created_at DESC)`);
+  await pool.query('ALTER TABLE nexpage_assets ADD COLUMN IF NOT EXISTS object_key TEXT');
+  await pool.query('ALTER TABLE nexpage_assets ALTER COLUMN file_data DROP NOT NULL');
 
   const defaults = buildDefaultConfig();
   await pool.query(
@@ -636,12 +660,22 @@ app.post("/api/nexpage/assets", requireLogin, requireSameOrigin, nextPageUpload.
     const title = String(req.body.title || path.basename(req.file.originalname, path.extname(req.file.originalname))).trim().slice(0, 140);
     const notes = String(req.body.notes || "").trim().slice(0, 2000);
     if (!title) return res.status(400).json({ error: "Add a title for this asset." });
-    const result = await pool.query(
-      `INSERT INTO nexpage_assets (title, category, original_name, mime_type, size_bytes, file_data, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, title, category, original_name, mime_type, size_bytes, notes, created_at`,
-      [title, category, req.file.originalname.slice(0, 255), req.file.mimetype || "application/octet-stream", req.file.size, req.file.buffer, notes]
-    );
+    const safeOriginal = path.basename(req.file.originalname || 'asset').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180) || 'asset';
+    const objectKey = 'nexpage/' + new Date().toISOString().slice(0, 10) + '/' + crypto.randomUUID() + '-' + safeOriginal;
+    const mimeType = req.file.mimetype || 'application/octet-stream';
+    await r2Request('PUT', objectKey, req.file.buffer, mimeType);
+    let result;
+    try {
+      result = await pool.query(
+        `INSERT INTO nexpage_assets (title, category, original_name, mime_type, size_bytes, file_data, object_key, notes)
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, $7)
+         RETURNING id, title, category, original_name, mime_type, size_bytes, notes, created_at`,
+        [title, category, req.file.originalname.slice(0, 255), mimeType, req.file.size, objectKey, notes]
+      );
+    } catch (dbError) {
+      try { await r2Request('DELETE', objectKey); } catch (_) {}
+      throw dbError;
+    }
     res.status(201).json({ success: true, asset: result.rows[0] });
   } catch (error) {
     console.error("NEXTPAGE upload failed:", error.message);
@@ -653,14 +687,15 @@ app.get("/api/nexpage/assets/:id/download", requireLogin, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid asset ID." });
-    const result = await pool.query("SELECT original_name, mime_type, file_data FROM nexpage_assets WHERE id = $1", [id]);
+    const result = await pool.query("SELECT original_name, mime_type, file_data, object_key FROM nexpage_assets WHERE id = $1", [id]);
     if (!result.rows.length) return res.status(404).json({ error: "NEXTPAGE asset not found." });
     const asset = result.rows[0];
     const safeName = String(asset.original_name || "asset").replace(/[\\r\\n"]/g, "_");
     res.setHeader("Content-Type", asset.mime_type || "application/octet-stream");
     res.setHeader("Content-Disposition", "attachment; filename=\"" + safeName + "\"");
     res.setHeader("Cache-Control", "no-store");
-    res.send(asset.file_data);
+    if (asset.object_key) { const object = await r2Request('GET', asset.object_key); res.send(Buffer.from(await object.arrayBuffer())); }
+    else res.send(asset.file_data);
   } catch (error) {
     console.error("NEXTPAGE download failed:", error.message);
     res.status(500).json({ error: "Unable to download this NEXTPAGE asset." });
@@ -671,8 +706,10 @@ app.delete("/api/nexpage/assets/:id", requireLogin, requireSameOrigin, async (re
   try {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid asset ID." });
+    const existing = await pool.query("SELECT object_key FROM nexpage_assets WHERE id = $1", [id]);
+    if (!existing.rows.length) return res.status(404).json({ error: "NEXTPAGE asset not found." });
+    if (existing.rows[0].object_key) await r2Request("DELETE", existing.rows[0].object_key);
     const result = await pool.query("DELETE FROM nexpage_assets WHERE id = $1 RETURNING id", [id]);
-    if (!result.rowCount) return res.status(404).json({ error: "NEXTPAGE asset not found." });
     res.json({ success: true });
   } catch (error) {
     console.error("NEXTPAGE delete failed:", error.message);
