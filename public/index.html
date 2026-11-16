@@ -272,7 +272,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
   <div class="brand"><div class="brand-mark">◎</div><div><div class="brand-title">Social Watch</div><div class="brand-sub">CONTROL CENTER</div></div></div>
   <div><div class="nav-label">Workspace</div><nav id="sideNav">
     <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span>Overview</button>
-    <button class="nav-btn" data-view="ai"><span class="nav-icon">✦</span>Spectrum AI</button>
+    <button class="nav-btn" data-view="ai"><span class="nav-icon">✦</span>Spectrum AI</button>\n    <button class="nav-btn" data-view="nexpage"><span class="nav-icon">▣</span>NEXTPAGE</button>
     <button class="nav-btn" data-view="alerts"><span class="nav-icon">◈</span>Alert inbox<span class="nav-count" id="navUnread">0</span></button>
     <button class="nav-btn" data-view="logs"><span class="nav-icon">≡</span>System logs<span class="nav-count" id="navLogCount">0</span></button>
     <button class="nav-btn" data-view="keywords"><span class="nav-icon">⌕</span>Keywords & rules</button>
@@ -286,7 +286,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 <div class="main">
   <header class="topbar">
     <div><div class="top-title" id="topTitle">Overview</div><div class="top-sub" id="topSub">Your monitoring, at a glance.</div></div>
-    <div class="top-actions"><span id="healthChip" class="status-chip"><span class="pulse-dot"></span>Checking status</span><button class="icon-btn" id="refreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button><div class="account-menu-wrap"><button class="btn ghost" id="accountMenuBtn" type="button" aria-expanded="false" aria-controls="accountDropdown">Account ▾</button><div class="account-dropdown hidden" id="accountDropdown" role="menu"><div class="dropdown-heading">Navigate</div><button class="dropdown-item" data-view="overview" role="menuitem">⌂ Overview</button><button class="dropdown-item" data-view="ai" role="menuitem">✦ Spectrum AI</button><button class="dropdown-item" data-view="alerts" role="menuitem">◈ Alerts</button><button class="dropdown-item" data-view="logs" role="menuitem">≡ System logs</button><button class="dropdown-item" data-view="keywords" role="menuitem">⌕ Keywords &amp; rules</button><button class="dropdown-item" data-view="automations" role="menuitem">⤳ Automations</button><button class="dropdown-item" data-view="integrations" role="menuitem">▦ Integrations</button><button class="dropdown-item" data-view="servers" role="menuitem">⚙ Server manager</button><button class="dropdown-item" data-view="settings" role="menuitem">⚙ Settings</button><div class="dropdown-divider"></div><form method="POST" action="/logout"><button class="dropdown-item logout-item" type="submit">Log out</button></form></div></div></div>
+    <div class="top-actions"><span id="healthChip" class="status-chip"><span class="pulse-dot"></span>Checking status</span><button class="icon-btn" id="refreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button><div class="account-menu-wrap"><button class="btn ghost" id="accountMenuBtn" type="button" aria-expanded="false" aria-controls="accountDropdown">Account ▾</button><div class="account-dropdown hidden" id="accountDropdown" role="menu"><div class="dropdown-heading">Navigate</div><button class="dropdown-item" data-view="overview" role="menuitem">⌂ Overview</button><button class="dropdown-item" data-view="ai" role="menuitem">✦ Spectrum AI</button><button class="dropdown-item" data-view="nexpage" role="menuitem">▣ NEXTPAGE</button><button class="dropdown-item" data-view="alerts" role="menuitem">◈ Alerts</button><button class="dropdown-item" data-view="logs" role="menuitem">≡ System logs</button><button class="dropdown-item" data-view="keywords" role="menuitem">⌕ Keywords &amp; rules</button><button class="dropdown-item" data-view="automations" role="menuitem">⤳ Automations</button><button class="dropdown-item" data-view="integrations" role="menuitem">▦ Integrations</button><button class="dropdown-item" data-view="servers" role="menuitem">⚙ Server manager</button><button class="dropdown-item" data-view="settings" role="menuitem">⚙ Settings</button><div class="dropdown-divider"></div><form method="POST" action="/logout"><button class="dropdown-item logout-item" type="submit">Log out</button></form></div></div></div>
   </header>
   <main class="content">
     <section class="view active" id="view-overview">
@@ -431,6 +431,43 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
       </div></article>
     </section>
 
+
+    <section class="view" id="view-nexpage">
+      <div class="page-head"><div><div class="eyebrow">Independent content workspace</div><h1>NEXTPAGE</h1><p class="lead">There's always another side. Store, organize, review, and manage every asset for TikTok and Instagram from this column.</p></div><button class="btn" id="nexpageRefresh">↻ Refresh files</button></div>
+      <div class="grid stats-grid">
+        <article class="card stat-card"><div class="stat-top"><span>Total assets</span><span class="stat-icon">▣</span></div><div class="stat-number" id="nexpageTotal">0</div><div class="stat-foot">Saved in dashboard storage</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>Scripts</span><span class="stat-icon">≡</span></div><div class="stat-number" id="nexpageScripts">0</div><div class="stat-foot">Narration and story drafts</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>Audio + scenes</span><span class="stat-icon">♫</span></div><div class="stat-number" id="nexpageMedia">0</div><div class="stat-foot">Voiceovers and generated visuals</div></article>
+        <article class="card stat-card"><div class="stat-top"><span>Finished videos</span><span class="stat-icon">▶</span></div><div class="stat-number" id="nexpageExports">0</div><div class="stat-foot">Ready for human review</div></article>
+      </div>
+      <div class="grid two-col">
+        <article class="card">
+          <div class="card-head"><div><h2>Upload a production asset</h2><p>Scripts, voiceovers, scene images, captions, and finished videos.</p></div><span class="state connected"><span class="state-dot"></span>Private workspace</span></div>
+          <form id="nexpageUploadForm" class="setting-list">
+            <div class="setting-row"><div class="setting-copy"><strong>Asset title</strong><p>A clear name you can search for later.</p></div><div class="setting-control"><input id="nexpageTitle" type="text" maxlength="140" placeholder="e.g. The Voicemail — narration" required></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Folder / category</strong><p>Choose where this file belongs.</p></div><div class="setting-control"><select id="nexpageCategory"><option value="scripts">Scripts</option><option value="voiceovers">Voiceovers</option><option value="scenes">Scene visuals</option><option value="finished_videos">Finished videos</option><option value="captions">Captions & subtitles</option><option value="other">Other assets</option></select></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Notes</strong><p>Optional production notes or version details.</p></div><div class="setting-control"><input id="nexpageNotes" type="text" maxlength="2000" placeholder="Version, scene number, review notes"></div></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Choose file</strong><p>Up to 80 MB per file. Common video, audio, image, text, subtitle, and PDF files.</p></div><div class="setting-control"><input id="nexpageFile" type="file" required accept=".mp4,.mov,.webm,.mp3,.wav,.m4a,.aac,.png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.json,.srt,.vtt"></div></div>
+            <div class="toolbar"><button class="btn primary" id="nexpageUploadButton" type="submit">Upload to NEXTPAGE</button><span class="rule-foot" id="nexpageUploadStatus">Files are stored privately in this dashboard's PostgreSQL database.</span></div>
+          </form>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><h2>Production controls</h2><p>Keep each stage visible and under your control.</p></div></div>
+          <div class="setting-list">
+            <div class="setting-row"><div class="setting-copy"><strong>Daily target</strong><p>Five original videos per day.</p></div><span class="state"><span class="state-dot"></span>5 / day</span></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Brand identity</strong><p>Black, white, dark red · mysterious, intelligent, entertaining.</p></div><span class="state connected"><span class="state-dot"></span>Set</span></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Review gate</strong><p>Nothing is published automatically. Review each export before posting.</p></div><span class="state connected"><span class="state-dot"></span>Manual review</span></div>
+            <div class="setting-row"><div class="setting-copy"><strong>Production folders</strong><p>Scripts · Voiceovers · Scene visuals · Captions · Finished videos · Other.</p></div><span class="state"><span class="state-dot"></span>Organized</span></div>
+          </div>
+          <div class="callout"><strong>Brand tagline:</strong> There's always another side.</div>
+        </article>
+      </div>
+      <article class="card section-gap">
+        <div class="card-head"><div><h2>Production library</h2><p id="nexpageAssetCount">Loading your files…</p></div><div class="toolbar"><select id="nexpageFilter" aria-label="Filter assets"><option value="">All folders</option><option value="scripts">Scripts</option><option value="voiceovers">Voiceovers</option><option value="scenes">Scene visuals</option><option value="finished_videos">Finished videos</option><option value="captions">Captions & subtitles</option><option value="other">Other assets</option></select><input id="nexpageSearch" type="text" placeholder="Search assets…" aria-label="Search assets"></div></div>
+        <div class="feed" id="nexpageAssetList"><div class="empty">Loading NEXTPAGE library…</div></div>
+      </article>
+    </section>
+
     <section class="view" id="view-settings">
       <div class="page-head"><div><div class="eyebrow">Preferences</div><h1>Settings</h1><p class="lead">Tune dashboard behavior without changing your private Railway credentials.</p></div><button class="btn primary" id="saveGeneralBtn">Save settings</button></div>
       <article class="card"><div class="card-head"><div><h2>Dashboard preferences</h2><p>These settings apply to this dashboard experience.</p></div></div><div class="setting-list">
@@ -452,15 +489,15 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(24px,3vw,34px);letter-spacing:-1.3px;
 </div>
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 <script>
-const state={view:"overview",config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0,aiMessages:[],aiLoaded:false,aiBusy:false,aiAttachments:[],aiPreferences:null};
+const state={view:"overview",nexpageAssets:[],config:null,alerts:[],logs:[],summary:null,integrations:[],knownIds:new Set(),firstLoad:true,refreshTimer:null,loadingSettings:false,alertOffset:0,alertTotal:0,theme:"dark",logTotal:0,aiMessages:[],aiLoaded:false,aiBusy:false,aiAttachments:[],aiPreferences:null};
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const titles={ai:["Spectrum AI","Your private local AI assistant."],overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],servers:["Server manager","Manage your hosted application services."],settings:["Settings","Dashboard and account preferences."],logs:["System logs","Search and review bot events, warnings, and errors."]};
+const titles={nexpage:["NEXTPAGE","Content studio · files, production assets, and review controls."],ai:["Spectrum AI","Your private local AI assistant."],overview:["Overview","Your monitoring, at a glance."],alerts:["Alert inbox","Filter and review captured events."],keywords:["Keywords & rules","Change what the bot watches."],automations:["Automations","Control notifications and quiet hours."],integrations:["Integrations","Service connections and source setup."],servers:["Server manager","Manage your hosted application services."],settings:["Settings","Dashboard and account preferences."],logs:["System logs","Search and review bot events, warnings, and errors."]};
 function getSavedTheme(){try{const value=window.localStorage.getItem("socialWatchTheme");return ["dark","light","ocean","purple"].includes(value)?value:"dark"}catch(e){return"dark"}}
 function applyTheme(theme,save=true){const allowed=["dark","light","ocean","purple"];const value=allowed.includes(theme)?theme:"dark";state.theme=value;document.documentElement.setAttribute("data-theme",value);const select=$("themeSelect");if(select)select.value=value;const meta=$("browserThemeColor");if(meta)meta.setAttribute("content",value==="light"?"#f3f6fb":value==="ocean"?"#071820":value==="purple"?"#160e22":"#080808");if(save){try{window.localStorage.setItem("socialWatchTheme",value)}catch(e){/* Private browsing may block storage; theme still works for this page. */}}}
 function toast(message,error=false){const node=document.createElement("div");node.className="toast"+(error?" error":"");node.textContent=message;$("toastStack").appendChild(node);setTimeout(()=>node.remove(),4300)}
 async function api(url,options={}){const headers={...(options.headers||{})};if(!(options.body instanceof FormData)&&!headers["Content-Type"])headers["Content-Type"]="application/json";const response=await fetch(url,{cache:"no-store",...options,headers});if(response.status===401){location.href="/login";throw new Error("Your session expired.")}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||("Request failed: "+response.status));return data}
-function switchView(view){if(!titles[view]){toast("This dashboard page is not available.",true);return}const target=$("view-"+view);if(!target){toast("The "+titles[view][0]+" page is missing from this dashboard build.",true);return}state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node===target));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="logs")loadLogs().catch(e=>toast(e.message,true));if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations();if(view==="servers")refreshServerStatus().catch(e=>toast(e.message,true));if(view==="ai")loadAI().catch(e=>toast(e.message,true))}
+function switchView(view){if(!titles[view]){toast("This dashboard page is not available.",true);return}const target=$("view-"+view);if(!target){toast("The "+titles[view][0]+" page is missing from this dashboard build.",true);return}state.view=view;document.querySelectorAll(".view").forEach(node=>node.classList.toggle("active",node===target));document.querySelectorAll("[data-view]").forEach(node=>node.classList.toggle("active",node.dataset.view===view));$("topTitle").textContent=titles[view][0];$("topSub").textContent=titles[view][1];if(view==="alerts")renderAlerts();if(view==="logs")loadLogs().catch(e=>toast(e.message,true));if(view==="keywords")renderKeywords();if(view==="automations")populateAutomationControls();if(view==="settings")populateGeneralControls();if(view==="integrations")renderIntegrations();if(view==="servers")refreshServerStatus().catch(e=>toast(e.message,true));if(view==="ai")loadAI().catch(e=>toast(e.message,true));if(view==="nexpage")loadNexpageAssets().catch(e=>toast(e.message,true))}
 const accountMenuBtn=$("accountMenuBtn"),accountDropdown=$("accountDropdown");accountMenuBtn?.addEventListener("click",event=>{event.stopPropagation();const opening=accountDropdown.classList.contains("hidden");accountDropdown.classList.toggle("hidden",!opening);accountMenuBtn.setAttribute("aria-expanded",String(opening));});document.addEventListener("click",event=>{if(accountDropdown&&!accountDropdown.contains(event.target)&&event.target!==accountMenuBtn){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("keydown",event=>{if(event.key==="Escape"){accountDropdown?.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}});document.addEventListener("click",event=>{const button=event.target instanceof Element?event.target.closest("[data-view],[data-go]"):null;if(!button)return;const view=button.dataset.view||button.dataset.go;if(!view)return;event.preventDefault();switchView(view);if(accountDropdown){accountDropdown.classList.add("hidden");accountMenuBtn?.setAttribute("aria-expanded","false");}},true);
 function priorityMarkup(value){const p=["high","medium","normal"].includes(value)?value:"normal";return '<span class="priority '+p+'">'+esc(p)+'</span>'}
 function timeAgo(value){if(!value)return"Never";const date=new Date(value);if(Number.isNaN(date.getTime()))return"Unknown";const seconds=Math.max(0,Math.round((Date.now()-date.getTime())/1000));if(seconds<60)return"Just now";if(seconds<3600)return Math.floor(seconds/60)+"m ago";if(seconds<86400)return Math.floor(seconds/3600)+"h ago";return date.toLocaleDateString()+" "+date.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
@@ -539,6 +576,30 @@ $("runServerAction").addEventListener("click",async()=>{
 refreshServerStatus();
 
 
+
+
+const nexpageCategoryNames={scripts:"Scripts",voiceovers:"Voiceovers",scenes:"Scene visuals",finished_videos:"Finished videos",captions:"Captions & subtitles",other:"Other assets"};
+function formatAssetSize(value){const n=Number(value||0);return n>=1048576?(n/1048576).toFixed(1)+" MB":n>=1024?(n/1024).toFixed(0)+" KB":n+" B"}
+function renderNexpageAssets(assets){
+ const filter=$("nexpageFilter").value,query=$("nexpageSearch").value.trim().toLowerCase();
+ const rows=(assets||[]).filter(a=>(!filter||a.category===filter)&&(!query||[a.title,a.original_name,a.notes,nexpageCategoryNames[a.category]].join(" ").toLowerCase().includes(query)));
+ $("nexpageTotal").textContent=assets.length;$("nexpageScripts").textContent=assets.filter(a=>a.category==="scripts").length;
+ $("nexpageMedia").textContent=assets.filter(a=>["voiceovers","scenes"].includes(a.category)).length;
+ $("nexpageExports").textContent=assets.filter(a=>a.category==="finished_videos").length;
+ $("nexpageAssetCount").textContent=rows.length+" shown · "+assets.length+" total assets";
+ $("nexpageAssetList").innerHTML=rows.length?rows.map(a=>'<div class="feed-row"><span class="feed-dot"></span><div><div class="feed-title">'+esc(a.title)+'</div><div class="feed-meta">'+esc(nexpageCategoryNames[a.category]||"Other")+' · '+esc(a.original_name)+' · '+formatAssetSize(a.size_bytes)+' · '+esc(new Date(a.created_at).toLocaleString())+(a.notes?' · '+esc(a.notes):"")+'</div></div><div class="toolbar"><a class="small-btn" href="/api/nexpage/assets/'+encodeURIComponent(a.id)+'/download">Download</a><button class="small-btn danger" data-nexpage-delete="'+esc(a.id)+'">Delete</button></div></div>').join(""):'<div class="empty">No assets match. Upload your first script, voiceover, scene, or finished video above.</div>';
+ $("nexpageAssetList").querySelectorAll("[data-nexpage-delete]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("Permanently delete this NEXTPAGE asset?"))return;try{await api("/api/nexpage/assets/"+encodeURIComponent(button.dataset.nexpageDelete),{method:"DELETE"});await loadNexpageAssets();toast("NEXTPAGE asset deleted.")}catch(e){toast(e.message,true)}}));
+}
+async function loadNexpageAssets(){const data=await api("/api/nexpage/assets");state.nexpageAssets=data.assets||[];renderNexpageAssets(state.nexpageAssets)}
+$("nexpageRefresh").addEventListener("click",()=>loadNexpageAssets().then(()=>toast("NEXTPAGE library refreshed.")).catch(e=>toast(e.message,true)));
+$("nexpageFilter").addEventListener("change",()=>renderNexpageAssets(state.nexpageAssets||[]));
+$("nexpageSearch").addEventListener("input",()=>renderNexpageAssets(state.nexpageAssets||[]));
+$("nexpageUploadForm").addEventListener("submit",async event=>{
+ event.preventDefault();const file=$("nexpageFile").files[0];if(!file)return toast("Choose a file first.",true);
+ const form=new FormData();form.append("file",file,file.name);form.append("title",$("nexpageTitle").value.trim());form.append("category",$("nexpageCategory").value);form.append("notes",$("nexpageNotes").value.trim());
+ const button=$("nexpageUploadButton");button.disabled=true;button.textContent="Uploading…";$("nexpageUploadStatus").textContent="Uploading and saving to the private asset library…";
+ try{await api("/api/nexpage/assets",{method:"POST",body:form});$("nexpageUploadForm").reset();await loadNexpageAssets();$("nexpageUploadStatus").textContent="Upload complete. Your asset is saved.";toast("File uploaded to NEXTPAGE.")}catch(e){$("nexpageUploadStatus").textContent=e.message;toast(e.message,true)}finally{button.disabled=false;button.textContent="Upload to NEXTPAGE"}
+});
 
 function renderAIMessages(){
   const node=$("aiMessages");
