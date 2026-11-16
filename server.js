@@ -598,12 +598,20 @@ app.get("/health", async (req, res) => {
   }
 });
 
+app.get("/terms", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "terms.html"));
+});
+
+app.get("/privacy", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "privacy.html"));
+});
+
 app.get("/login", (req, res) => {
   if (verifySession(getCookie(req, SESSION_COOKIE))) return res.redirect("/");
   res.send(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Social Watch — Login</title>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(700px 340px at 80% 0,#1c2a4a 0,transparent 70%),#0b1120;color:#edf3ff;font-family:Arial,sans-serif;padding:20px}.card{width:100%;max-width:410px;background:#111a2d;padding:32px;border:1px solid #263550;border-radius:18px;box-shadow:0 25px 70px #0003}.brand{font-size:23px;font-weight:800;margin-bottom:6px}.muted{color:#91a3bd;line-height:1.6;font-size:13px}label{display:block;font-size:12px;margin-top:18px}input,button{width:100%;padding:13px;margin-top:8px;border-radius:9px;font-size:14px}input{background:#0b1322;color:white;border:1px solid #34445f}button{border:0;background:#8591f5;color:#0b1120;font-weight:bold;cursor:pointer;margin-top:22px}#error{color:#ff9292}</style></head><body><main class="card"><div class="brand">◎ Social Watch</div><p class="muted">Sign in to open your monitoring control center.</p><form method="POST" action="/login"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button><p id="error" role="alert"></p></form></main><script>if(new URLSearchParams(location.search).has("error"))document.getElementById("error").textContent="Login failed. Check your credentials."</script></body></html>`);
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(700px 340px at 80% 0,#1c2a4a 0,transparent 70%),#0b1120;color:#edf3ff;font-family:Arial,sans-serif;padding:20px}.card{width:100%;max-width:410px;background:#111a2d;padding:32px;border:1px solid #263550;border-radius:18px;box-shadow:0 25px 70px #0003}.brand{font-size:23px;font-weight:800;margin-bottom:6px}.muted{color:#91a3bd;line-height:1.6;font-size:13px}label{display:block;font-size:12px;margin-top:18px}input,button{width:100%;padding:13px;margin-top:8px;border-radius:9px;font-size:14px}input{background:#0b1322;color:white;border:1px solid #34445f}button{border:0;background:#8591f5;color:#0b1120;font-weight:bold;cursor:pointer;margin-top:22px}#error{color:#ff9292}</style></head><body><main class="card"><div class="brand">◎ Social Watch</div><p class="muted">Sign in to open your monitoring control center.</p><p class="muted" style="margin-top:18px"><a href="/terms" style="color:#f09ca4">Terms of Service</a> · <a href="/privacy" style="color:#f09ca4">Privacy Policy</a></p><form method="POST" action="/login"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button><p id="error" role="alert"></p></form></main><script>if(new URLSearchParams(location.search).has("error"))document.getElementById("error").textContent="Login failed. Check your credentials."</script></body></html>`);
 });
 
 app.post("/login", (req, res) => {
