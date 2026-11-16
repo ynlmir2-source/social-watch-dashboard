@@ -18,6 +18,18 @@ const aiUpload = multer({
   },
 });
 
+
+const nextPageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 80 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, callback) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const allowed = new Set([".mp4", ".mov", ".webm", ".mp3", ".wav", ".m4a", ".aac", ".png", ".jpg", ".jpeg", ".webp", ".pdf", ".txt", ".md", ".json", ".srt", ".vtt"]);
+    if (!allowed.has(ext)) return callback(new Error("Unsupported NEXTPAGE file type."));
+    callback(null, true);
+  },
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STUDIO_RELAY_TOKEN = process.env.STUDIO_RELAY_TOKEN || "";
@@ -503,6 +515,22 @@ async function initializeDatabase() {
     )
   `);
 
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nexpage_assets (
+      id BIGSERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL CHECK (category IN ('scripts','voiceovers','scenes','finished_videos','captions','other')),
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes BIGINT NOT NULL,
+      file_data BYTEA NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS nexpage_assets_created_idx ON nexpage_assets (created_at DESC)`);
+
   const defaults = buildDefaultConfig();
   await pool.query(
     `INSERT INTO social_watch_settings (id, config)
@@ -584,6 +612,74 @@ app.post("/logout", requireLogin, (req, res) => {
 app.get("/", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
+
+app.get("/api/nexpage/assets", requireLogin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, title, category, original_name, mime_type, size_bytes, notes, created_at FROM nexpage_assets ORDER BY created_at DESC LIMIT 500"
+    );
+    res.set("Cache-Control", "no-store");
+    res.json({ assets: result.rows });
+  } catch (error) {
+    console.error("NEXTPAGE asset listing failed:", error.message);
+    res.status(500).json({ error: "Unable to load NEXTPAGE assets." });
+  }
+});
+
+app.post("/api/nexpage/assets", requireLogin, requireSameOrigin, nextPageUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "Choose a file to upload." });
+    const allowedCategories = new Set(["scripts", "voiceovers", "scenes", "finished_videos", "captions", "other"]);
+    const category = String(req.body.category || "other");
+    if (!allowedCategories.has(category)) return res.status(400).json({ error: "Choose a valid asset category." });
+    const title = String(req.body.title || path.basename(req.file.originalname, path.extname(req.file.originalname))).trim().slice(0, 140);
+    const notes = String(req.body.notes || "").trim().slice(0, 2000);
+    if (!title) return res.status(400).json({ error: "Add a title for this asset." });
+    const result = await pool.query(
+      `INSERT INTO nexpage_assets (title, category, original_name, mime_type, size_bytes, file_data, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, title, category, original_name, mime_type, size_bytes, notes, created_at`,
+      [title, category, req.file.originalname.slice(0, 255), req.file.mimetype || "application/octet-stream", req.file.size, req.file.buffer, notes]
+    );
+    res.status(201).json({ success: true, asset: result.rows[0] });
+  } catch (error) {
+    console.error("NEXTPAGE upload failed:", error.message);
+    res.status(500).json({ error: "Unable to save this NEXTPAGE file." });
+  }
+});
+
+app.get("/api/nexpage/assets/:id/download", requireLogin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid asset ID." });
+    const result = await pool.query("SELECT original_name, mime_type, file_data FROM nexpage_assets WHERE id = $1", [id]);
+    if (!result.rows.length) return res.status(404).json({ error: "NEXTPAGE asset not found." });
+    const asset = result.rows[0];
+    const safeName = String(asset.original_name || "asset").replace(/[\\r\\n"]/g, "_");
+    res.setHeader("Content-Type", asset.mime_type || "application/octet-stream");
+    res.setHeader("Content-Disposition", "attachment; filename=\"" + safeName + "\"");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(asset.file_data);
+  } catch (error) {
+    console.error("NEXTPAGE download failed:", error.message);
+    res.status(500).json({ error: "Unable to download this NEXTPAGE asset." });
+  }
+});
+
+app.delete("/api/nexpage/assets/:id", requireLogin, requireSameOrigin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ error: "Invalid asset ID." });
+    const result = await pool.query("DELETE FROM nexpage_assets WHERE id = $1 RETURNING id", [id]);
+    if (!result.rowCount) return res.status(404).json({ error: "NEXTPAGE asset not found." });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("NEXTPAGE delete failed:", error.message);
+    res.status(500).json({ error: "Unable to delete this NEXTPAGE asset." });
+  }
+});
+
 
 app.get("/api/dashboard/summary", requireLogin, async (req, res) => {
   try {
@@ -1482,10 +1578,10 @@ app.post("/api/ai/chat", requireLogin, requireSameOrigin, aiUpload.array("files"
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   if (error instanceof multer.MulterError) {
-    const message = error.code === "LIMIT_FILE_SIZE" ? "Each attachment must be 6 MB or smaller." : "You can attach up to 5 files per message.";
+    const message = error.code === "LIMIT_FILE_SIZE" ? "The uploaded file exceeds its size limit." : "The upload could not be processed.";
     return res.status(413).json({ error: message });
   }
-  if (String(error.message || "").startsWith("Unsupported file type.")) return res.status(400).json({ error: error.message });
+  if (String(error.message || "").startsWith("Unsupported file type.") || String(error.message || "").startsWith("Unsupported NEXTPAGE file type.")) return res.status(400).json({ error: error.message });
   console.error("Request failed:", error.message);
   res.status(400).json({ error: "The request could not be processed." });
 });
